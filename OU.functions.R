@@ -14,21 +14,60 @@ covariance <- function(lambda, sigma, intervals) {
   return(kernel)
 }
 
+# generate a student t set
+generate_student_set <- function(n_series, student_df, mu, lambda, sigma, intervals, seed=1) {
+  set.seed(seed)
+  n <- length(intervals)
+  
+  # observations
+  obs <- list()
+  for(i in 1:n_series) {
+    
+    # student or gaussian oup?
+    if(is.finite(student_df)) {
+      
+      shape = ((student_df-2)/student_df)*covariance(lambda[i], sigma[i], intervals)
+      obs[[i]] <- rmvt(1, df=student_df,  delta = rep(mu[i], n), sigma = shape, type="shifted") %>% as.matrix()
+      
+    } else {
+      
+      shape = covariance(lambda[i], sigma[i], intervals)
+      obs[[i]] <- rmvt(1, df=student_df,  delta = rep(mu[i], n), sigma = shape, type="shifted") %>% as.matrix()
+      
+    }
+    
+    
+  }
+  
+  # make matrix
+  obs <- do.call(rbind, obs)
+  
+  # if(n_series == 1) {
+  #   obs <- obs %>% t() %>% as.vector()
+  # }
+  
+  return(list(Y=obs, N=n_series, time=intervals, T=n, student_df=ifelse(is.finite(student_df), student_df, -99), mu_values=mu, lambda_values=lambda, sigma_values=sigma))
+}
+
+
+
+#### DUMP ####
+
 # Alternative generator
-ou_simulator <- function (T, mu, lambda, kappa, x0 = NULL, seed=1) {
+ou_simulator <- function (T, mu, lambda, sigma, x0 = NULL, seed=1) {
   seed <- seed
   x <- c()
   
   # Initial value
   if (is.null(x0)) {
-    x[[1]] <- mu + rnorm(1) * sqrt(kappa)
+    x[[1]] <- mu + rnorm(1) * sqrt((sigma^2)/(2*lambda))
   } else {
     x[[1]] <- x0
   }
   
   # Consecutive values
   for (t in 2:T) {
-    x[[t]] <- mu - (mu - x[[t-1]]) * exp(-lambda) + rnorm(1) * sqrt(kappa * (1 - exp(-2 * lambda)))
+    x[[t]] <- mu - (mu - x[[t-1]]) * exp(-lambda) + rnorm(1) * sqrt((sigma^2)/(2*lambda) * (1 - exp(-2 * lambda)))
   }
   
   #gompertz assumptions, poisson meanl 
@@ -66,42 +105,6 @@ generate_mvrnormal <- function(n_series, mu, lambda, sigma, intervals) {
   return(list(Y=obs, N=n_series, time=intervals, T=n))
 }
 
-
-
-# generate a set with the values attached
-generate_student_set <- function(n_series, student_df, mu, lambda, sigma, intervals) {
-  
-  n <- length(intervals)
-
-  # observations
-  obs <- list()
-  for(i in 1:n_series) {
-    
-  # student or gaussian oup?
-    if(is.finite(student_df)) {
-      
-      shape = ((student_df-2)/student_df)*covariance(lambda[i], sigma[i], intervals)
-      obs[[i]] <- rmvt(1, df=student_df,  delta = rep(mu[i], n), sigma = shape, type="shifted") %>% as.matrix()
-      
-    } else {
-      
-      shape = covariance(lambda[i], sigma[i], intervals)
-      obs[[i]] <- rmvt(1, df=student_df,  delta = rep(mu[i], n), sigma = shape, type="shifted") %>% as.matrix()
-      
-    }
-    
-
-  }
-  
-  # make matrix
-  obs <- do.call(rbind, obs)
-  
-  # if(n_series == 1) {
-  #   obs <- obs %>% t() %>% as.vector()
-  # }
-  
-  return(list(Y=obs, N=n_series, time=intervals, T=n, student_df=ifelse(is.finite(student_df), student_df, -99), mu_values=mu, lambda_values=lambda, sigma_values=sigma))
-}
 
 
 
@@ -506,4 +509,91 @@ concatenate_series_matrix <- function(s_list) {
   
   return(list(Y=obs, time=s_list[[1]][["time"]], N=length(s_list), T=length(s_list[[1]][["time"]])))
   
+}
+
+
+
+oup_invG_lambda <- function(n=compare_n_series, shape=2, scale=0.5) {
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- 1
+    while(x >= 1) {
+      x <- MCMCpack::rinvgamma(1, shape = shape, scale = scale)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+}
+
+r_non_negative_normal <- function(n, mean, sd) {
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- -1
+    while(x < 0) {
+      x <- rnorm(1, mean = mean, sd = sd)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+}
+
+oup_G_lambda <- function(n=compare_n_series, shape=2, scale=4) {
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- 1
+    while(x >= 1) {
+      x <- rgamma(1, shape = shape, scale = scale)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+}
+
+oup_normal_lambda <- function(n=compare_n_series, shape=0.4, scale=0.2) {
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- 1
+    while(x >= 1 | x <= 0) {
+      x <- rnorm(1, shape, scale)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+}
+
+
+plot_pos_sequence <- function(stan_list, par="lambda") {
+
+  
+  # get samples
+  pos <- lapply(names(stan_list), function(x) rstan::extract(stan_list[[x]], par)[[1]]) %>% set_names(names(stan_list))
+  
+  pos <- do.call(cbind, pos) %>% set_colnames(names(stan_list)) %>% melt %>% mutate(observations=as.factor(Var2))
+  
+  # generate plot
+  p <- ggplot(pos, aes(x=value, color=observations)) + stat_density(aes(color=observations), geom="line", position = "identity") + labs(y="Density", x=par %>% str_to_title())
+  # + scale_color_manual(type = "seq", palette = 4)
+  
+  return(p)
+}
+
+
+plot_pos <- function(stan_obj, par="lambda") {
+  # get samples
+  pos <- rstan::extract(stan_obj, par)[[1]] %>% as_tibble %>% melt
+  # generate plot
+  p <- ggplot(pos, aes(x=value, color=variable)) + stat_density(geom="line", position = "identity") + labs(y="Density", x=par %>% str_to_title()) + xlab(TeX(paste0("$\\", par))) + scale_color_manual(name="Sample size", values="black", labels="100")
+  return(p)
 }

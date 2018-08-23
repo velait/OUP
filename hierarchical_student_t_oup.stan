@@ -42,7 +42,7 @@ parameters {
   
   // vector [N] lambda_raw;
   vector<lower=0, upper=1> [N] lambda;
-  vector [N] sigma_raw;
+  vector<lower=0> [N] sigma_raw;
   // vector<lower=0> [N] sigma;
   vector [N] mu_raw;
   // vector [N] mu;
@@ -50,7 +50,7 @@ parameters {
   // real<lower=0> student_df;
   
   // hyperparameters 
-  real<lower=0> lambda_alpha;
+  real<lower=2> lambda_alpha;
   real<lower=0> lambda_beta;
   real mu_mu;
   real<lower=0> mu_sigma;
@@ -65,8 +65,8 @@ transformed parameters {
   // vector<lower=0> [N] lambda = lambda_mu + lambda_sigma*lambda_raw;
   
   // mode and variance of gamma prior
-  real<lower=0> gamma_mode = lambda_beta/(lambda_alpha + 1);
-  real<lower=0> gamma_variance = (lambda_beta^2)/((lambda_alpha-1)^2*(lambda_alpha-2));
+  real<lower=0> inv_gamma_mode = lambda_beta/(lambda_alpha + 1);
+  real<lower=0> inv_gamma_variance = (lambda_beta^2)/((lambda_alpha-1)^2*(lambda_alpha-2));
 }
 
 model {
@@ -88,8 +88,8 @@ model {
   // student_df ~ normal(0, 100);
   
   //hyper priors
-  lambda_alpha ~ normal(0, 5);
-  lambda_beta ~ normal(0, 5);
+  lambda_alpha ~ normal(2, 2);
+  lambda_beta ~ normal(1, 2);
   
   mu_mu ~ normal(5, 5);
   mu_sigma ~ normal(0, 5);

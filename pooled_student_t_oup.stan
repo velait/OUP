@@ -76,14 +76,17 @@ model {
     Y[i] ~ multi_student_t(student_df, vectorize(mu, T), ((student_df-2)/student_df)*shape(student_df, sigma, lambda, time, T));
   }
   
-  // priorsstan_manual
-  lambda ~ gamma(2, 0.1);
+  
+  // UNIFORM PRIORS
+  
+  
+  // lambda ~ gamma(2, 0.1);
   // lambda_raw ~ normal(0, 1);
   
-  mu ~ normal(5, 5);
+  // mu ~ normal(5, 5);
   // mu_raw ~ normal(0, 1);
   
-  sigma  ~ normal(0, 5);
+  // sigma  ~ normal(0, 5);
   // sigma_raw ~ normal(0, 1);
   
   // student_df ~ normal(0, 100);
