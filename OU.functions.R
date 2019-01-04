@@ -15,9 +15,16 @@ covariance <- function(lambda, sigma, intervals) {
 }
 
 # generate a student t set
-generate_student_set <- function(n_series, student_df, mu, lambda, sigma, intervals, seed=1) {
+generate_student_set <- function(n_series, student_df, mu, lambda, sigma, kappa = NULL, intervals, seed=1) {
   set.seed(seed)
   n <- length(intervals)
+  
+  if(!is.null(kappa)) {
+    sigma = sqrt(2*kappa*lambda)
+  }
+  
+  
+
   
   # observations
   obs <- list()
@@ -42,11 +49,21 @@ generate_student_set <- function(n_series, student_df, mu, lambda, sigma, interv
   # make matrix
   obs <- do.call(rbind, obs)
   
-  # if(n_series == 1) {
-  #   obs <- obs %>% t() %>% as.vector()
-  # }
+  if(n_series == 1) {
+    obs <- obs %>% t() %>% as.vector()
+  }
   
-  return(list(Y=obs, N=n_series, time=intervals, T=n, student_df=ifelse(is.finite(student_df), student_df, -99), mu_values=mu, lambda_values=lambda, sigma_values=sigma))
+  return(list(Y=obs,
+              N=n_series,
+              time=intervals,
+              T=n,
+              student_df=ifelse(is.finite(student_df),
+                                student_df,
+                                -99),
+              mu_values = mu,
+              lambda_values = lambda,
+              sigma_values = sigma,
+              kappa_values = kappa))
 }
 
 
@@ -154,12 +171,13 @@ generate_a_series <- function(kappa=NULL, sigma=NULL, lambda, mu, intervals, t.d
   
   scale <- if(is.finite(t.df)) rep(sqrt(rgamma(1,t.df/2,(t.df-2)/2)),each=N) else 1
   out.data <- list()
-  out.data$observations <- as.vector(t(L) %*% (rnorm(N) * scale)) + mu
+  out.data$Y <- as.vector(t(L) %*% (rnorm(N) * scale)) + mu
   # out.data$observations <- rpois(N,exp(as.vector(t(L) %*% (rnorm(N) * scale))+mu))
   out.data$time <- intervals
   out.data$n_series <- 1L
   out.data$samples_per_series <- array(length(intervals))
   out.data$T <- length(intervals)
+  out.data$student_df <- t.df
   out.data
 }
 

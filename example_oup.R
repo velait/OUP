@@ -1,68 +1,81 @@
-# Example for the IDA paper
 
-#### SETTIGS ####
+# ************************************************************************
+# ******************** Single series example *****************************
+# ************************************************************************
+ 
+
 library(rstan)
-library(tidyverse)
 library(magrittr)
-library(MCMCpack)
+library(shinystan)
 library(mvtnorm)
-library(reshape2)
-library(latex2exp)
 library(cowplot)
-
-
-theme_set(theme_bw(12))
-options(mc.cores = parallel::detectCores())
-set.seed(11235)
 
 source("OU.functions.R")
 
-
-iter <- 2000
-chains <- 2
-
-#### EXAMPLE ####
-## Data
-example_data <- generate_student_set(1, student_df = 7, mu = 0, sigma = 0.5, lambda = 0.5, intervals = 1:150, seed=69)
+# Compile model
+oup_model <- stan_model(file = "single_series_oup.stan")
 
 
-# Model
-pooled_student_t_oup <- stan_model("pooled_student_t_oup.stan")
-
-# Plot
-example_plot <- ggplot() + geom_line(data=example_data[["Y"]] %>% t %>%  as_tibble, aes(y=V1, x=1:150)) + labs(x="Time", y="") + scale_y_continuous(limits = c(-3, 3))
-
-# Sample
-example_samples <- sampling(pooled_student_t_oup, example_data, chains=2, iter=2000)
-
-#### Results
-
-# Samples
-example_pos <- sapply(c("lambda", "mu", "sigma"), function(x) rstan::extract(example_samples, x)) %>% set_names(c("lambda", "mu", "sigma"))
-
-# melt_pos <- do.call(cbind, example_pos) %>% as_tibble() %>% set_colnames(c("lambda", "mu", "sigma")) %>% melt
-
-# collect to a df
-df <- do.call(cbind, example_pos) %>% as_tibble() %>% set_colnames(c("lambda", "mu", "sigma"))
-
-# list for plots
-example_pos_plot <- list()
-
-example_pos_plot[["mu"]] <- ggplot(df, aes(x=mu)) + stat_density(geom="line") + labs(y="", x=expression(~mu)) + scale_x_continuous(limits=c(-.5, .5)) + geom_vline(xintercept = 0, linetype="dashed")
-
-example_pos_plot[["lambda"]] <- ggplot(df, aes(x=lambda)) + stat_density(geom="line") + labs(y="Density", x=expression(~lambda)) + scale_x_continuous(limits=c(0, 1.1), breaks=c(0, .25, .5, .75, 1)) + geom_vline(xintercept = 0.5, linetype="dashed")
-
-example_pos_plot[["sigma"]] <- ggplot(df, aes(x=sigma)) + stat_density(geom="line") + labs(y="", x=expression(~sigma)) + scale_x_continuous(limits=c(0, 1.2)) + geom_vline(xintercept = 0.5, linetype="dashed")
 
 
-# Arrange to a grid
-posterior_row <- plot_grid(example_pos_plot[["lambda"]], example_pos_plot[["mu"]], example_pos_plot[["sigma"]], nrow=1)
+# Set parameter values
+mu <- 0
+lambda <- 0.5
+sigma <- 0.25
+intervals <- 1:100
+
+# Simulate data
+stan_data <- generate_student_set(n_series = 1,
+                                  student_df = 5,
+                                  mu = mu,
+                                  lambda = lambda,
+                                  sigma = sigma,
+                                  intervals = intervals,
+                                  seed = 11235)
 
 
-example_plot <- plot_grid(example_plot, posterior_row, labels = c("A", "B"), nrow = 2, rel_heights = c(1, 1))
+# Plot data
+stan_data$Y %>% plot(x = intervals, type = "l")
 
 
-# example_plot %>% print
+
+
+
+# Sample from posterior
+samples <- sampling(oup_model,
+                    stan_data,
+                    chains = 1,
+                    iter = 1000)
+
+
+# Get posterior samples
+posterior <- sapply(c("lambda", "mu", "sigma"),
+                    function(x) rstan::extract(samples, x)) %>%
+  set_names(c("lambda", "mu", "sigma"))
+
+
+# Plot posterior with simulation values
+posterior_plot <- lapply(c("lambda", "mu", "sigma"), function(x) {
+  
+  p <- posterior[[x]] %>% 
+    as.data.frame() %>%
+    ggplot(aes(x = .)) +
+    geom_density() +
+    geom_vline(xintercept = eval(parse(text = x)), linetype = "dashed") +
+    labs(title = x) +
+    scale_x_continuous(limits = c(eval(parse(text = x))-1, eval(parse(text = x))+1))
+  
+  
+}) 
+
+
+plot_grid(posterior_plot[[1]], posterior_plot[[2]], posterior_plot[[3]], nrow = 1)
+
+
+
+# ShinyStan
+samples %>% launch_shinystan()
+
 
 
 
