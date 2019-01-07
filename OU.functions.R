@@ -66,7 +66,22 @@ generate_student_set <- function(n_series, student_df, mu, lambda, sigma, kappa 
               kappa_values = kappa))
 }
 
-
+restricted_rlnorm <- function(n, meanlog = 0, sdlog = 1, lower = 0, upper = 1) {
+  
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- 1
+    while(x >= upper | x <= lower) {
+      x <- rlnorm(1, meanlog = meanlog, sdlog = sdlog)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+  
+}
 
 #### DUMP ####
 

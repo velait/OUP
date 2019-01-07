@@ -42,58 +42,106 @@ parameters {
   
   // vector [N] lambda_raw;
   vector<lower=0, upper=1> [N] lambda;
-  vector<lower=0> [N] sigma_raw;
-  // vector<lower=0> [N] sigma;
+  // vector<lower=0> [N] sigma_raw;
+  vector<lower=0> [N] sigma;
   vector [N] mu_raw;
   // vector [N] mu;
   
   // real<lower=0> student_df;
   
   // hyperparameters 
-  real<lower=2> lambda_alpha;
-  real<lower=0> lambda_beta;
-  real mu_mu;
-  real<lower=0> mu_sigma;
-  real<lower=0> sigma_mu;
-  real<lower=0> sigma_sigma;
+  real<lower=2> lambda_mean;
+  real<lower=0> lambda_sd;
+  real mu_mean;
+  real<lower=0> mu_sd;
+  real<lower=0> sigma_mean;
+  real<lower=0> sigma_sd;
 }
 
 transformed parameters {
   // non-center mu and sigma
-  vector [N] mu = mu_mu + mu_sigma*mu_raw;
-  vector<lower=0> [N] sigma = sigma_mu + sigma_sigma*sigma_raw;
-  // vector<lower=0> [N] lambda = lambda_mu + lambda_sigma*lambda_raw;
-  
+  vector [N] mu = mu_mean + mu_sd*mu_raw;
+
   // mode and variance of gamma prior
-  real<lower=0> inv_gamma_mode = lambda_beta/(lambda_alpha + 1);
-  real<lower=0> inv_gamma_variance = (lambda_beta^2)/((lambda_alpha-1)^2*(lambda_alpha-2));
+  // real<lower=0> inv_gamma_mode = lambda_sd/(lambda_mean + 1);
+  // real<lower=0> inv_gamma_variance = (lambda_sd^2)/((lambda_mean-1)^2*(lambda_mean-2));
 }
 
 model {
   
-  for(i in 1:N) {
-    Y[i] ~ multi_student_t(student_df, vectorize(mu[i], T), ((student_df-2)/student_df)*shape(student_df, sigma[i], lambda[i], time, T));
-  }
+  // for(i in 1:N) {
+  //   
+  //   Y[i, 1] ~ normal(mu[i], sqrt(2*lambda[i]*sigma[i]));
+  //   
+  //   
+  //   for(j in 2:T) {
+  //     
+  //     real delta_t = time[j] - time[j-1];
+  //     
+  //     Y[i, j] ~ normal(mu[i] - (mu[i] - Y[i, j-1])*exp(-lambda[i]*delta_t), sqrt(2*lambda[i]*sigma[i])*(1-exp(-2*lambda[i]*delta_t)));
+  //     
+  //   }
+    
+    
+    // OR
+    
+    for(i in 1:N) {
+      Y[i] ~ multi_student_t(student_df, vectorize(mu[i], T), ((student_df-2)/student_df)*shape(student_df, sigma[i], lambda[i], time, T));
+
+    }
+    
+    
+    
+    // OR
+
+  //     for(i in 1:N) {
+  // 
+  //   real kappa = lambda[i]*sigma[i];
+  //   real log_kappa = log(kappa);
+  // 
+  //   target += -0.5*log_kappa - (Y[i, 1] - mu[i])/kappa;
+  // 
+  // 
+  //   for(j in 2:T) {
+  // 
+  //     real delta_t = time[j] - time[j-1];
+  //     real helper = 1 - exp(-2*lambda[i]*delta_t);
+  // 
+  // 
+  //     target += -0.5*kappa - 0.5*log(helper) - (Y[i, j] - mu[i] - exp(-lambda[i]*delta_t)*(Y[i, j-1] - mu[i]))*pow(kappa*helper, -1);
+  // 
+  //   }
+  // 
+  // 
+  // }
   
   // priors
-  lambda ~ inv_gamma(lambda_alpha, lambda_beta);
+  lambda ~ inv_gamma(lambda_mean, lambda_sd);
   // lambda_raw ~ normal(0, 1);
+  // lambda ~ lognormal(lambda_mean, lambda_sd);
   
-  // mu     ~ normal(mu_mu, mu_sigma);
+  
+  // mu     ~ normal(mu_mean, mu_sd);
   mu_raw ~ normal(0, 1);
   
-  // sigma  ~ normal(sigma_mu, sigma_sigma);
-  sigma_raw ~ normal(0, 1);
+  sigma  ~ normal(sigma_mean, sigma_sd);
+  // sigma_raw ~ normal(0, 1);
+  // sigma ~ lognormal(sigma_mean, sigma_sd);
   
   // student_df ~ normal(0, 100);
   
   //hyper priors
-  lambda_alpha ~ normal(2, 10);
-  lambda_beta ~ normal(1, 10);
+  lambda_mean ~ normal(2, 10);
+  lambda_sd ~ normal(1, 10);
+  // lambda_mean ~ normal(0, 5);
+  // lambda_sd ~ normal(0, 5);
+  // 
   
-  mu_mu ~ normal(5, 5);
-  mu_sigma ~ normal(0, 5);
+  mu_mean ~ normal(5, 5);
+  mu_sd ~ normal(0, 5);
   
-  sigma_mu ~ normal(0, 5);
-  sigma_sigma ~ normal(0, 5);
+  sigma_mean ~ normal(0, 5);
+  sigma_sd ~ normal(0, 5);
+  
+  
 }

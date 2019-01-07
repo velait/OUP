@@ -79,6 +79,14 @@ model {
   }
   
   
+  
+  // lambda ~ lognormal(0, 1);
+  // sigma ~ lognormal(0, 1);
+  
+  lambda ~ inv_gamma(2.5, 2);
+  sigma ~ normal(.5, 1);
+  mu ~ normal(0, 5);
+  
   // UNIFORM PRIORS
   
   
