@@ -83,6 +83,101 @@ restricted_rlnorm <- function(n, meanlog = 0, sdlog = 1, lower = 0, upper = 1) {
   
 }
 
+# Is a value inside interval?
+inside <- function(x, interval, or_equal = FALSE) {
+  
+  if(length(interval) != 2) {
+    stop("Bad interval")
+  }
+  
+  if(or_equal == TRUE) {
+    is_in <- (x >= interval[1]) & (x <= interval[2])
+  } else {
+    is_in <- (x > interval[1]) & (x < interval[2])
+  }
+  
+  
+  return(unname(is_in))
+  
+}
+
+# Get smallest IQR inside which the simulation value is
+get_IQRs <- function(stanfit, parameter, parameter_values) {
+  
+  prob = 100:1/100
+  
+  posterior <- rstan::extract(stanfit, pars = parameter)[[1]] %>% 
+    as.data.frame()
+  
+  if(dim(posterior)[2] == 1 & length(parameter_values) > 1) {
+    
+    posterior <- rep(posterior, length(parameter_values)) %>% do.call(cbind, .)
+    
+  }
+  
+  IQR_df <- lapply(1:length(parameter_values), function(i) {
+    
+    interval_membership <- sapply(1:length(prob), FUN = function(j) {
+      interval <- posterior[, i] %>% quantile(probs = c(.5 - prob[j]/2, .5 + prob[j]/2))
+      inside(parameter_values[i], interval)
+    }) %>% set_names(prob)
+    
+    interval <- which(interval_membership == TRUE) %>%
+      tail(n=1) %>%
+      names
+    
+    if(sum(interval_membership == FALSE) == length(prob)) {
+      interval <- 1
+    }
+    
+
+    return(c(parameter = parameter, index = i, simulation_value = parameter_values[i], IQR = interval))
+    
+  }) %>%
+    do.call(rbind, .) %>% 
+    as.data.frame() %>% 
+    cbind(.,
+          n_series = n_series,
+          n_observations = n_observations)
+  
+  IQR_df$IQR <- IQR_df$IQR %>% as.character() %>% as.numeric
+  IQR_df$simulation_value <- IQR_df$simulation_value %>% as.character() %>% as.numeric
+  
+  IQR_df <- IQR_df %>% mutate(mean_IQR = mean(IQR))
+  
+  return(IQR_df)
+  
+}
+
+# Get posterior median
+get_posterior_mode <- function(stanfit, parameter) {
+  
+  posterior <- rstan::extract(stanfit, pars = parameter)[[1]] %>% 
+    as.data.frame()
+  
+  medians <- apply(posterior, 2, FUN = function(x) quantile(x, probs = c(.5))) %>% 
+    unname
+  
+  return(medians)
+}
+
+# Generate positive normal numbers
+restricted_rnorm <- function(n, mean, sd, lower = 0) {
+  vec <- c()
+  for(i in 1:n) {
+    
+    x <- lower -1
+    while(x < lower) {
+      x <- rnorm(1, mean, sd)
+    }
+    
+    vec[i] <- x
+  }
+  
+  return(vec)
+}
+
+
 #### DUMP ####
 
 # Alternative generator
@@ -591,20 +686,7 @@ oup_G_lambda <- function(n=compare_n_series, shape=2, scale=4) {
   return(vec)
 }
 
-oup_normal_lambda <- function(n=compare_n_series, shape=0.4, scale=0.2) {
-  vec <- c()
-  for(i in 1:n) {
-    
-    x <- 1
-    while(x >= 1 | x <= 0) {
-      x <- rnorm(1, shape, scale)
-    }
-    
-    vec[i] <- x
-  }
-  
-  return(vec)
-}
+
 
 
 plot_pos_sequence <- function(stan_list, par="lambda") {

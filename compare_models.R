@@ -5,8 +5,8 @@
 
 ## Data **************** ####
 
-n_series <- 10
-intervals <- 1:10
+n_series <- 5
+intervals <- 1:30
 
 # # lambda ~ logNormal
 # lambda_mean <- -.5
@@ -72,6 +72,15 @@ partially_pooled_samples <- sampling(hierarchical_student_t_oup,
                                           chains=chains,
                                           init=1)
 
+save(pooled_samples, 
+     non_pooled_samples,
+     partially_pooled_samples,
+     lambda, 
+     mu,
+     sigma,
+     intervals, 
+     n_series,
+     file = "results/samples_5_30.Rds")
 
 ## Results ************* ####
 
