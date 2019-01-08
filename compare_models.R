@@ -5,8 +5,8 @@
 
 ## Data **************** ####
 
-n_series <- 50
-intervals <- 1:50
+n_series <- 10
+intervals <- 1:10
 
 # # lambda ~ logNormal
 # lambda_mean <- -.5
@@ -23,7 +23,6 @@ lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
 sigma_mean <- .2
 sigma_sd <- .1
 sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
-
 
 
 # mu ~ Normal
