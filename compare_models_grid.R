@@ -120,18 +120,16 @@ results <- loop_results %>%
   do.call(rbind, .) %>% 
   set_rownames(NULL)
 
-save(results, file = "results/results.Rds")
+write.csv(results, file = "results/results.csv")
 
 # Plot ******************************************************* ####
 
 results %>%
-  filter(parameter == 'sigma') %>%
+  filter(parameter == 'sigma' & model == "partially") %>%
   ggplot(aes(x = n_series, y = n_observations, z = IQR)) +
   stat_summary_hex()
 
 
-results %>%
-  filter(parameter == 'sigma')
 
   
 
