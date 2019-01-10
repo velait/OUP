@@ -29,8 +29,8 @@ mu_sd <- .25
 #**************************************
 
 
-series_grid <- 5*1:40
-observation_grid <- 5*1:10
+series_grid <- 2
+observation_grid <- 5
 
 
 # Loop over series and observations ************************* ####
@@ -124,10 +124,13 @@ write.csv(results, file = "results/results.csv")
 
 # Plot ******************************************************* ####
 
-results %>%
-  filter(parameter == 'sigma' & model == "partially") %>%
-  ggplot(aes(x = n_series, y = n_observations, z = IQR)) +
-  stat_summary_hex()
+results %>% 
+  filter(n_series == 2) %>% 
+  filter(parameter == "lambda") %>% 
+  filter(model == "partially") %>% 
+  ggplot(aes(x = n_observations, y = IQR)) +
+  geom_point() +
+  geom_smooth()
 
 
 

@@ -130,8 +130,14 @@ get_IQRs <- function(stanfit, parameter, parameter_values) {
       interval <- 1
     }
     
+    IQR50 <- quantile(posterior[, i], probs = c(.25, .75)) %>% unname()
 
-    return(c(parameter = parameter, index = i, simulation_value = parameter_values[i], IQR = interval))
+    return(c(parameter = parameter,
+             index = i,
+             simulation_value = parameter_values[i],
+             IQR_min = interval,
+             IQR50_lower = IQR50[1],
+             IQR50_upper = IQR50[2]))
     
   }) %>%
     do.call(rbind, .) %>% 
