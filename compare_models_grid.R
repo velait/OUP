@@ -29,16 +29,16 @@ mu_sd <- .25
 #**************************************
 
 
-series_grid <- 5*1:2
-observation_grid <- 5*1:3
+series_grid <- 5*1:40
+observation_grid <- 5*1:10
 
 
 # Loop over series and observations ************************* ####
 
 loop_results <- list()
 
-chains <- 1
-iter <- 10
+chains <- 2
+iter <- 2000
 
 for(n_series in series_grid) {
   print(n_series)
@@ -120,16 +120,18 @@ results <- loop_results %>%
   do.call(rbind, .) %>% 
   set_rownames(NULL)
 
+save(results, file = "results/results.Rds")
 
 # Plot ******************************************************* ####
 
 results %>%
-  filter(parameter == 'lambda') %>%
-  ggplot(aes(x = n_series, y = n_observations, color = IQR)) +
-  geom_jitter()
+  filter(parameter == 'sigma') %>%
+  ggplot(aes(x = n_series, y = n_observations, z = IQR)) +
+  stat_summary_hex()
 
 
-
+results %>%
+  filter(parameter == 'sigma')
 
   
 
