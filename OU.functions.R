@@ -131,13 +131,20 @@ get_IQRs <- function(stanfit, parameter, parameter_values) {
     }
     
     IQR50 <- quantile(posterior[, i], probs = c(.25, .75)) %>% unname()
+    
+    mean <- posterior[, i] %>% mean
+    median <- posterior[, i] %>% median
+    sd <- posterior[, i] %>% sd
 
     return(c(parameter = parameter,
              index = i,
              simulation_value = parameter_values[i],
              IQR_min = interval,
              IQR50_lower = IQR50[1],
-             IQR50_upper = IQR50[2]))
+             IQR50_upper = IQR50[2],
+             mean = mean,
+             median = median,
+             sd = sd))
     
   }) %>%
     do.call(rbind, .) %>% 
@@ -146,12 +153,17 @@ get_IQRs <- function(stanfit, parameter, parameter_values) {
           n_series = n_series,
           n_observations = n_observations)
   
-  IQR_df$IQR <- IQR_df$IQR %>% as.character() %>% as.numeric
-  IQR_df$simulation_value <- IQR_df$simulation_value %>% as.character() %>% as.numeric
-  
-  IQR_df <- IQR_df %>% mutate(mean_IQR = mean(IQR))
-  
+  IQR_df$IQR_min <- IQR_df$IQR_min %>% as.character() %>% as.numeric
+  IQR_df$sd <- IQR_df$sd %>% as.character() %>% as.numeric
+  IQR_df <- IQR_df %>%
+    mutate(mean_IQR = mean(IQR_min), mean_sd = mean(sd))
+
+
   return(IQR_df)
+  
+}
+
+hyperparameter_results <- function(stanfit, parameter, parameter_values) {
   
 }
 

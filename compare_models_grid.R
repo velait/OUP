@@ -6,13 +6,18 @@
 #       n_series,
 #         lambda, mu, sigma (simulation values)
 
-load(file = "results/samples_5_30.Rds")
+# load(file = "results/samples_5_30.Rds")
 
 
 # Settings *************************************************** #### 
 seed <- 11235
 
 parameters <- c('mu', 'lambda', 'sigma')
+
+
+chains <- 1
+iter <- 1000
+
 
 # Hyperparameters *********************
 # lambda ~ inv_gamma
@@ -29,16 +34,19 @@ mu_sd <- .25
 #**************************************
 
 
-series_grid <- 2
-observation_grid <- 5
+series_grid <- c(2, 5, 10, 20)
+observation_grid <- c(5, 10, 15, 20, 25)
+
+# Stan models ************************************************ ####
+pooled_student_t_oup <- stan_model("stan_models/pooled_student_t_oup.stan")
+non_pooled_student_t_oup <- stan_model("stan_models/non_pooled_student_t_oup.stan")
+hierarchical_student_t_oup <- stan_model("stan_models/hierarchical_student_t_oup.stan")
 
 
-# Loop over series and observations ************************* ####
+
+# Loop over series and observations ************************** ####
 
 loop_results <- list()
-
-chains <- 2
-iter <- 2000
 
 for(n_series in series_grid) {
   print(n_series)
@@ -49,6 +57,7 @@ for(n_series in series_grid) {
     print(n_observations)
     
     # Data
+    seed <- n_series*n_observations
     set.seed(seed)
     lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
     sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
@@ -106,9 +115,23 @@ for(n_series in series_grid) {
         do.call(rbind, .) %>% 
         mutate(model = model)
       
-    }) %>% do.call(rbind, .)
+    }) %>%
+      do.call(rbind, .)
     
-    
+    # hyperparameter_results[[n_observations %>% as.character()]]  <- lapply(names(models), function(model) {
+    #   
+    #   lapply(hyper_parameters, function(p) {
+    #     
+    #     get_hyperparamters(models[[model]] , p, get(p))
+    #     
+    #   }) %>%
+    #     do.call(rbind, .) %>% 
+    #     mutate(model = model)
+    #   
+    # }) %>%
+    #   do.call(rbind, .)
+       
+     
   }
   
   results <- results %>% do.call(rbind, .)
@@ -120,22 +143,79 @@ results <- loop_results %>%
   do.call(rbind, .) %>% 
   set_rownames(NULL)
 
+for(col in c("mean_sd", "sd", "simulation_value", "IQR50_lower", "IQR50_upper", "mean_IQR", "IQR_min", "mean", "median")) {
+  results[, col] <- results[, col] %>% as.character() %>% as.numeric()
+}
+
 write.csv(results, file = "results/results.csv")
 
 # Plot ******************************************************* ####
 
-results %>% 
-  filter(n_series == 2) %>% 
-  filter(parameter == "lambda") %>% 
-  filter(model == "partially") %>% 
-  ggplot(aes(x = n_observations, y = IQR)) +
-  geom_point() +
-  geom_smooth()
-
-
 
   
+## Get modelwise estimate plots
+modelwise_estimate_panels <- lapply(parameters, function(par) {
+  
+  df <- results %>% 
+    filter(parameter == par) %>% 
+    mutate(index = index %>% as.numeric)
+
+  p <- df %>% 
+    ggplot()  + 
+    geom_line(data = df, aes(x=index, y=simulation_value)) +
+    geom_errorbar(data = df %>% filter(model != "pooled"),
+                  aes(x=index, ymin=IQR50_lower, ymax=IQR50_upper, color = model, width = 0.1),
+                  position = "dodge") +
+    facet_wrap(c( "n_observations", "n_series"), labeller = "label_both") +
+    labs(x="Series", y="Posterior estimate", title=par) +
+    guides(color=guide_legend("Model")) +
+    scale_color_manual(values = c("#999999", "#E69F00"))+
+    theme_bw()
+  
+  # Add complete pooling estimate
+  p <- p + geom_line(data = df %>% filter(model == "pooled"), aes(x = index, y = median), linetype ="dashed")
+  
+  return(p)
+  
+})
 
 
 
+# Minimal IQR panel
+minimal_IQR_panel <- lapply(parameters, function(par) {
+  
+  results %>% 
+    filter(parameter == par) %>% 
+    ggplot(aes(x = n_observations, y = IQR_min, color = index)) +
+    geom_line() +
+    facet_wrap(c( "model", "n_series"), labeller = "label_both", nrow = 3) +
+    theme_bw() +
+    scale_color_brewer(palette = 7)
+  
+})
 
+
+minimal_average_IQR_panel <- lapply(parameters, function(par) {
+  
+  results %>% 
+    filter(parameter == par) %>% 
+    ggplot(aes(x = n_observations, y = mean_IQR, color = as.factor(n_series))) +
+    geom_line() +
+    facet_wrap(c( "model"), nrow =1) +
+    theme_bw() +
+    scale_color_brewer(palette = 7)
+  
+})
+
+
+average_sd_panel <- lapply(parameters, function(par) {
+  
+  results %>% 
+    filter(parameter == par) %>% 
+    ggplot(aes(x = n_observations, y = mean_sd, color = as.factor(n_series))) +
+    geom_line() +
+    facet_wrap(c( "model"), nrow =1) +
+    theme_bw() +
+    scale_color_brewer(palette = 7)
+  
+})
