@@ -16,7 +16,7 @@ parameters <- c('mu', 'lambda', 'sigma')
 
 
 chains <- 1
-iter <- 1000
+iter <- 2000
 
 
 # Hyperparameters *********************
