@@ -13,7 +13,7 @@ library(cowplot)
 source("OU.functions.R")
 
 # Compile model
-oup_model <- stan_model(file = "single_series_oup.stan")
+oup_model <- stan_model(file = "stan_models/alt_single_series_oup.stan")
 
 
 

@@ -149,6 +149,7 @@ for(col in c("mean_sd", "sd", "simulation_value", "IQR50_lower", "IQR50_upper", 
 
 write.csv(results, file = "results/results.csv")
 
+results <- read.csv(file = "results/results.csv")
 # Plot ******************************************************* ####
 
 
@@ -158,15 +159,16 @@ modelwise_estimate_panels <- lapply(parameters, function(par) {
   
   df <- results %>% 
     filter(parameter == par) %>% 
-    mutate(index = index %>% as.numeric)
+    group_by(model, n_observations, n_series) %>% 
+    mutate(rank = rank(simulation_value))
 
   p <- df %>% 
     ggplot()  + 
-    geom_line(data = df, aes(x=index, y=simulation_value)) +
+    geom_line(data = df, aes(x=rank, y=simulation_value)) +
     geom_errorbar(data = df %>% filter(model != "pooled"),
-                  aes(x=index, ymin=IQR50_lower, ymax=IQR50_upper, color = model, width = 0.1),
+                  aes(x=rank, ymin=IQR50_lower, ymax=IQR50_upper, color = model, width = 0.25),
                   position = "dodge") +
-    facet_wrap(c( "n_observations", "n_series"), labeller = "label_both") +
+    facet_wrap(c( "n_observations", "n_series"), labeller = "label_both", ncol = length(series_grid)) +
     labs(x="Series", y="Posterior estimate", title=par) +
     guides(color=guide_legend("Model")) +
     scale_color_manual(values = c("#999999", "#E69F00"))+
@@ -177,22 +179,24 @@ modelwise_estimate_panels <- lapply(parameters, function(par) {
   
   return(p)
   
-})
+}) %>% set_names(parameters)
 
 
 
 # Minimal IQR panel
 minimal_IQR_panel <- lapply(parameters, function(par) {
   
-  results %>% 
+  df <- results %>% 
     filter(parameter == par) %>% 
-    ggplot(aes(x = n_observations, y = IQR_min, color = index)) +
-    geom_line() +
-    facet_wrap(c( "model", "n_series"), labeller = "label_both", nrow = 3) +
-    theme_bw() +
-    scale_color_brewer(palette = 7)
+    select(index, simulation_value, IQR_min, n_series, n_observations, model)
+    
+  df %>% ggplot(aes(x = model, y = IQR_min)) +
+    geom_point() +
+    facet_wrap(c("n_series", "n_observations"), labeller = "label_both") +
+    geom_line(data = df, aes(x=model, y=IQR_min, group = index)) +
+    theme_bw()
   
-})
+})%>% set_names(parameters)
 
 
 minimal_average_IQR_panel <- lapply(parameters, function(par) {
@@ -203,9 +207,9 @@ minimal_average_IQR_panel <- lapply(parameters, function(par) {
     geom_line() +
     facet_wrap(c( "model"), nrow =1) +
     theme_bw() +
-    scale_color_brewer(palette = 7)
+    labs(y = "Mean min IQR") 
   
-})
+}) %>% set_names(parameters)
 
 
 average_sd_panel <- lapply(parameters, function(par) {
@@ -215,7 +219,7 @@ average_sd_panel <- lapply(parameters, function(par) {
     ggplot(aes(x = n_observations, y = mean_sd, color = as.factor(n_series))) +
     geom_line() +
     facet_wrap(c( "model"), nrow =1) +
-    theme_bw() +
-    scale_color_brewer(palette = 7)
+    theme_bw()
+    
   
-})
+})%>% set_names(parameters)

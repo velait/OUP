@@ -1,34 +1,32 @@
 # Compare different models
 
-
+chains <- 1
+iter <- 1000
 
 
 ## Data **************** ####
 
-n_series <- 5
-intervals <- 1:30
-
-# # lambda ~ logNormal
-# lambda_mean <- -.5
-# lambda_sd <- 0.1
-# lambda <- restricted_rlnorm(n_series, meanlog = lambda_mean, sdlog = lambda_sd)
+n_series <- 10
+intervals <- 1:15
 
 # lambda ~ inv_gamma
 lambda_mean <- 20
 lambda_sd <- 10
-lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
+# lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
+# lambda <- rep(.5, n_series)
+lambda <- restricted_rnorm(n_series, .65, 0.2, lower = 0)
 
-
-# sigma ~ logNormal
+# sigma ~ normal
 sigma_mean <- .2
 sigma_sd <- .1
 sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
-
+# sigma <- rep(.25, n_series)
 
 # mu ~ Normal
 mu_mean <- 0
 mu_sd <- .25
 mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
+# mu <- rep(0, n_series)
 
 # Generate set of series
 diff_compare_data <- generate_student_set(n_series = n_series,
@@ -63,7 +61,7 @@ pooled_samples <- sampling(pooled_student_t_oup,
 non_pooled_samples <- sampling(non_pooled_student_t_oup,
                                     diff_compare_data,
                                     iter=iter,
-                                    chains=chains, 
+                                    chains=chains,
                                     init=1)
 
 partially_pooled_samples <- sampling(hierarchical_student_t_oup,
@@ -72,15 +70,15 @@ partially_pooled_samples <- sampling(hierarchical_student_t_oup,
                                           chains=chains,
                                           init=1)
 
-save(pooled_samples, 
-     non_pooled_samples,
-     partially_pooled_samples,
-     lambda, 
-     mu,
-     sigma,
-     intervals, 
-     n_series,
-     file = "results/samples_5_30.Rds")
+# save(pooled_samples, 
+#      non_pooled_samples,
+#      partially_pooled_samples,
+#      lambda, 
+#      mu,
+#      sigma,
+#      intervals, 
+#      n_series,
+#      file = "results/samples_5_30.Rds")
 
 ## Results ************* ####
 
@@ -276,3 +274,6 @@ for(par in c("lambda", "sigma", "mu")) {
   
 }
 
+
+
+plot_grid(diff_compare_plots[['lambda']], diff_compare_plots[['sigma']], diff_compare_plots[['mu']])

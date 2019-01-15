@@ -50,7 +50,8 @@ parameters {
   // real<lower=0> student_df;
   
   // hyperparameters 
-  real<lower=2> lambda_mean;
+  real<lower=0, upper = 1> lambda_mean;
+  // real<lower=2> lambda_mean;
   real<lower=0> lambda_sd;
   real mu_mean;
   real<lower=0> mu_sd;
@@ -116,7 +117,9 @@ model {
   // }
   
   // priors
-  lambda ~ inv_gamma(lambda_mean, lambda_sd);
+  // lambda ~ inv_gamma(lambda_mean, lambda_sd);
+  // lambda ~ inv_gamma(5, lambda_sd);
+  lambda ~ normal(lambda_mean, lambda_sd);
   // lambda_raw ~ normal(0, 1);
   // lambda ~ lognormal(lambda_mean, lambda_sd);
   
@@ -131,8 +134,8 @@ model {
   // student_df ~ normal(0, 100);
   
   //hyper priors
-  lambda_mean ~ normal(2, 10);
-  lambda_sd ~ normal(1, 10);
+  lambda_mean ~ normal(.5, 1);
+  lambda_sd ~ normal(5., 1);
   // lambda_mean ~ normal(0, 5);
   // lambda_sd ~ normal(0, 5);
   // 

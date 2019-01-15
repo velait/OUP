@@ -1,0 +1,128 @@
+# Compute completely pooled models posterior = likelihood*prior by hand
+# Assume delta_t = 1 for simplicity
+
+# OUP generator
+generate_oup <- function(x0 = NULL, n = 100, lambda = .5, mu = 0, sigma = .25) {
+  
+  kappa <- (sigma^2)/(2*lambda)
+  
+  # First observation
+  if(is.null(x0)) {
+    x <- rnorm(1, mu, kappa)
+  } else {
+    x = x0
+  }
+  
+  
+  # Consecutive observations
+  for(i in 2:n) {
+    
+    step <- rnorm(1,
+                  mean = mu - (mu - x[i-1])*exp(-lambda),
+                  sd = kappa*(1 - exp(-2*lambda)))
+    
+    x <- c(x, step)
+    
+  }
+  
+  return(x)
+}
+
+
+# Likelihood (normal, not t-distribution)
+oup_log_likelihood <- function(x, lambda = .5, mu = 0, sigma = .25) {
+  
+  kappa <- (sigma^2)/(2*lambda)
+  
+  
+    # First observation is sampled from stationary distribution
+    lh <- dnorm(x[1], mean = mu, sd = sqrt(kappa))
+    
+    # lh_next <- 
+    
+    # Consecutive observations given the previous
+    for(i in 2:length(x)) {
+      
+      step <- dnorm(x[i],
+                  mean = mu - (mu - x[i-1])*exp(-lambda),
+                  sd = kappa*(1 - exp(-2*lambda)))
+      
+      lh <- c(lh, step)
+      
+    }
+  
+  llh <- prod(lh) %>% log
+    
+  return(llh)
+}
+
+
+## Sample
+
+samples <- 100
+
+# Priors
+# mu <- rnorm(n = samples, mean = 0, sd = 1)
+# sigma <- restricted_rnorm(n = samples , mean = .5, sd = 1, lower = 0)
+
+
+
+resolution <- 100
+
+
+
+# One series
+ 
+series <- generate_oup()
+# marginalize over mu and sigma
+lambda_marginal <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
+  print(l)
+  
+  minus_mu <- sapply(seq(-1, 1, length.out = resolution), function(m) {
+    
+    minus_sigma <- sapply(seq(0.001, 1, length.out = resolution), function(s) {
+      oup_log_likelihood(x = series, lambda = l, mu = m, sigma = s)
+    }
+    )
+    
+    return(minus_sigma %>% exp %>% sum %>% log)
+    
+  }
+  )
+  
+  return(minus_mu %>% exp %>% sum %>% log)
+  
+})
+
+
+## Multiple series
+
+many_series <- lapply(1:25, function(i) generate_oup(n = 50)) %>% 
+  do.call(rbind, .)
+
+
+lambda_marginal_many <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
+  print(l)
+  
+  minus_mu <- sapply(seq(-1, 1, length.out = resolution), function(m) {
+    
+    minus_sigma <- sapply(seq(0.001, 1, length.out = resolution), function(s) {
+      
+      sapply(1:nrow(many_series), FUN = function(i) {
+        oup_log_likelihood(x = many_series[i, ], lambda = l, mu = m, sigma = s)
+      }) %>% sum
+      
+      
+    }
+    )
+    
+    return(minus_sigma %>% exp %>% sum %>% log)
+    
+  }
+  )
+  
+  return(minus_mu %>% exp %>% sum %>% log)
+  
+})
+
+
