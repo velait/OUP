@@ -13,20 +13,20 @@ intervals <- 1:15
 lambda_mean <- 20
 lambda_sd <- 10
 # lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
-# lambda <- rep(.5, n_series)
-lambda <- restricted_rnorm(n_series, .65, 0.2, lower = 0)
+lambda <- rep(.5, n_series)
+# lambda <- restricted_rnorm(n_series, .65, 0.2, lower = 0)
 
 # sigma ~ normal
 sigma_mean <- .2
 sigma_sd <- .1
-sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
-# sigma <- rep(.25, n_series)
+# sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
+sigma <- rep(.25, n_series)
 
 # mu ~ Normal
 mu_mean <- 0
 mu_sd <- .25
-mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
-# mu <- rep(0, n_series)
+# mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
+mu <- rep(0, n_series)
 
 # Generate set of series
 diff_compare_data <- generate_student_set(n_series = n_series,

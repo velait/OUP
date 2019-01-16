@@ -70,7 +70,7 @@ resolution <- 100
 
 
 
-# One series
+# One series **************************************** ####
  
 series <- generate_oup(n = 50)
 # marginalize over mu and sigma
@@ -94,10 +94,64 @@ lambda_marginal <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
 })
 
 
-## Multiple series
+## Multiple series ********************************** ####
 
-many_series <- lapply(1:25, function(i) generate_oup(n = 50)) %>% 
+many_series <- lapply(1:20, function(i) generate_oup(n = 25)) %>% 
   do.call(rbind, .)
+
+# Hold sigma and mu fixed
+lambda_marginal_many <- lapply(1:20, function(x) {
+  print(x)
+  many_series <- lapply(1:x, function(i) generate_oup(n = 25)) %>% 
+    do.call(rbind, .)
+  
+  samples <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
+    print(l)
+    
+    minus_mu <- sapply(0, function(m) {
+      
+      
+      
+      
+      minus_sigma <- sapply(.25, function(s) {
+        
+        sapply(1:nrow(many_series), FUN = function(i) {
+          oup_log_likelihood(x = many_series[i, ], lambda = l, mu = m, sigma = s)
+        }) %>% sum
+        
+        
+      }
+      )
+      
+      
+      
+      return(minus_sigma)
+      
+    }
+    )
+    
+    return(minus_mu)
+    
+  })
+  
+  samples/sum(samples)
+})
+
+
+lambda_marginal_many_df <- lapply(1:length(lambda_marginal_many), function(x) {
+  
+  df <- data.frame(n_series = x,
+                   y = lambda_marginal_many[[x]],
+                   x = seq(0.0001, 1, length.out = resolution))
+  
+}) %>% do.call(rbind, .)
+
+lambda_marginal_many_df %>%
+  filter((n_series %% 4) == 0) %>% 
+  ggplot(aes(x = x, y = y, color = as.factor(n_series))) +
+  geom_line() +
+  scale_color_brewer(type = "seq", palette = 2)
+ 
 
 
 lambda_marginal_many <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
