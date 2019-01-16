@@ -59,7 +59,6 @@ oup_log_likelihood <- function(x, lambda = .5, mu = 0, sigma = .25) {
 
 ## Sample
 
-samples <- 100
 
 # Priors
 # mu <- rnorm(n = samples, mean = 0, sd = 1)
@@ -73,7 +72,7 @@ resolution <- 100
 
 # One series
  
-series <- generate_oup()
+series <- generate_oup(n = 50)
 # marginalize over mu and sigma
 lambda_marginal <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
   print(l)
@@ -104,7 +103,11 @@ many_series <- lapply(1:25, function(i) generate_oup(n = 50)) %>%
 lambda_marginal_many <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
   print(l)
   
+  
   minus_mu <- sapply(seq(-1, 1, length.out = resolution), function(m) {
+    
+    
+    
     
     minus_sigma <- sapply(seq(0.001, 1, length.out = resolution), function(s) {
       
@@ -115,6 +118,8 @@ lambda_marginal_many <- sapply(seq(0.0001, 1, length.out = resolution), function
       
     }
     )
+    
+    
     
     return(minus_sigma %>% exp %>% sum %>% log)
     
