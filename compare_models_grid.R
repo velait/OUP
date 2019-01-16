@@ -59,9 +59,12 @@ for(n_series in series_grid) {
     # Data
     seed <- n_series*n_observations
     set.seed(seed)
-    lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
-    sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
-    mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
+    # lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
+    lambda <- .5
+    # sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
+    sigma <- 0.25
+    # mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
+    mu <- 0
     
     diff_compare_data <- generate_student_set(n_series = n_series,
                                               student_df = 7,
