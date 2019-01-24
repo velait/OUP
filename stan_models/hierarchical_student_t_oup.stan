@@ -41,7 +41,8 @@ data {
 parameters {
   
   // vector [N] lambda_raw;
-  vector<lower=0, upper=1> [N] lambda;
+  // vector<lower=0, upper=1> [N] lambda;
+  vector<lower=0> [N] inv_lambda;
   // vector<lower=0> [N] sigma_raw;
   vector<lower=0> [N] sigma;
   vector [N] mu_raw;
@@ -50,9 +51,9 @@ parameters {
   // real<lower=0> student_df;
   
   // hyperparameters 
-  real<lower=0, upper = 1> lambda_mean;
+  real<lower=2> inv_lambda_mean;
   // real<lower=2> lambda_mean;
-  real<lower=0> lambda_sd;
+  real<lower=1> inv_lambda_sd;
   real mu_mean;
   real<lower=0> mu_sd;
   real<lower=0> sigma_mean;
@@ -62,6 +63,9 @@ parameters {
 transformed parameters {
   // non-center mu and sigma
   vector [N] mu = mu_mean + mu_sd*mu_raw;
+  
+  vector<lower = 0> [N] lambda = rep_vector(1, N)./inv_lambda;
+
 
   // mode and variance of gamma prior
   // real<lower=0> inv_gamma_mode = lambda_sd/(lambda_mean + 1);
@@ -87,7 +91,9 @@ model {
     // OR
     
     for(i in 1:N) {
-      Y[i] ~ multi_student_t(student_df, vectorize(mu[i], T), ((student_df-2)/student_df)*shape(student_df, sigma[i], lambda[i], time, T));
+      Y[i] ~ multi_student_t(student_df,
+      rep_vector(mu[i], T),
+      ((student_df-2)/student_df)*shape(student_df, sigma[i], lambda[i], time, T));
 
     }
     
@@ -119,7 +125,7 @@ model {
   // priors
   // lambda ~ inv_gamma(lambda_mean, lambda_sd);
   // lambda ~ inv_gamma(5, lambda_sd);
-  lambda ~ normal(lambda_mean, lambda_sd);
+  inv_lambda ~ inv_gamma(inv_lambda_mean, inv_lambda_sd);
   // lambda_raw ~ normal(0, 1);
   // lambda ~ lognormal(lambda_mean, lambda_sd);
   
@@ -134,8 +140,8 @@ model {
   // student_df ~ normal(0, 100);
   
   //hyper priors
-  lambda_mean ~ normal(.5, 1);
-  lambda_sd ~ normal(5., 1);
+  inv_lambda_mean ~ normal(5, 20);
+  inv_lambda_sd ~ normal(5, 20);
   // lambda_mean ~ normal(0, 5);
   // lambda_sd ~ normal(0, 5);
   // 

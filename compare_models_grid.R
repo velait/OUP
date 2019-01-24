@@ -57,14 +57,14 @@ for(n_series in series_grid) {
     print(n_observations)
     
     # Data
-    seed <- n_series*n_observations
+    seed <- n_series*n_observations + 1
     set.seed(seed)
-    # lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
-    lambda <- .5
-    # sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
-    sigma <- 0.25
-    # mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
-    mu <- 0
+    lambda <- oup_invG_lambda(n_series, shape = lambda_mean, scale = lambda_sd)
+    # lambda <- rep(.5, n_series)
+    sigma <- rnorm(n_series, mean = sigma_mean, sd = sigma_sd)
+    # sigma <- rep(.25, n_series)
+    mu <- rnorm(n_series, mean = mu_mean, sd = mu_sd)
+    # mu <- rep(0, n_series)
     
     diff_compare_data <- generate_student_set(n_series = n_series,
                                               student_df = 7,
@@ -85,24 +85,27 @@ for(n_series in series_grid) {
                                chains=chains,
                                init=1)
     
-    non_pooled_samples <- sampling(non_pooled_student_t_oup,
-                                   diff_compare_data,
-                                   iter=iter,
-                                   chains=chains, 
-                                   init=1)
+    # non_pooled_samples <- sampling(non_pooled_student_t_oup,
+    #                                diff_compare_data,
+    #                                iter=iter,
+    #                                chains=chains, 
+    #                                init=1)
     
-    partially_pooled_samples <- sampling(hierarchical_student_t_oup,
-                                         diff_compare_data,
-                                         iter=iter,
-                                         chains=chains,
-                                         init=1)
+    # partially_pooled_samples <- sampling(hierarchical_student_t_oup,
+    #                                      diff_compare_data,
+    #                                      iter=iter,
+    #                                      chains=chains,
+    #                                      init=1)
     
-    models <- list(pooled_samples, 
-                   non_pooled_samples,
-                   partially_pooled_samples) %>% 
-      set_names(c("pooled", 
-                  "non_pooled",
-                  "partially"))
+    models <- list(pooled_samples) %>% 
+      set_names(c("pooled"))
+    
+    # models <- list(pooled_samples, 
+    #                non_pooled_samples,
+    #                partially_pooled_samples) %>% 
+    #   set_names(c("pooled", 
+    #               "non_pooled",
+    #               "partially"))
     
     
     
@@ -150,9 +153,9 @@ for(col in c("mean_sd", "sd", "simulation_value", "IQR50_lower", "IQR50_upper", 
   results[, col] <- results[, col] %>% as.character() %>% as.numeric()
 }
 
-write.csv(results, file = "results/results.csv")
-
-results <- read.csv(file = "results/results.csv")
+# write.csv(results, file = "results/results.csv")
+# 
+# results <- read.csv(file = "results/results.csv")
 # Plot ******************************************************* ####
 
 
@@ -184,7 +187,28 @@ modelwise_estimate_panels <- lapply(parameters, function(par) {
   
 }) %>% set_names(parameters)
 
+## Parameterwise psoterior means for pooled model
+pooled_parameters_posterior_means <- lapply(parameters, function(par) {
+  
+  results <- results %>%  mutate(mean = as.numeric(as.character(mean)))
+  
+  df <- results %>% 
+    filter(parameter == par) %>% 
+    group_by(model, n_observations, n_series) %>% 
+    mutate(rank = rank(simulation_value), inv_mean = 1/mean)
 
+  
+  p <- df %>%
+    filter(model == "pooled") %>%
+    ggplot(aes(x = n_series, y = mean, color = as.factor(n_observations))) +
+    geom_line() +
+    labs(title = par) +
+    theme(legend.position = "top")
+  
+})
+plot_grid(pooled_parameters_posterior_means[[1]],
+          pooled_parameters_posterior_means[[2]], 
+          pooled_parameters_posterior_means[[3]], ncol = 3)
 
 # Minimal IQR panel
 minimal_IQR_panel <- lapply(parameters, function(par) {
@@ -225,4 +249,4 @@ average_sd_panel <- lapply(parameters, function(par) {
     theme_bw()
     
   
-})%>% set_names(parameters)
+}) %>% set_names(parameters)

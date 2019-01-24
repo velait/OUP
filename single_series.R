@@ -13,7 +13,7 @@ library(cowplot)
 source("OU.functions.R")
 
 # Compile model
-oup_model <- stan_model(file = "stan_models/alt_single_series_oup.stan")
+oup_model <- stan_model(file = "stan_models/single_series_oup.stan")
 
 
 
@@ -21,6 +21,7 @@ oup_model <- stan_model(file = "stan_models/alt_single_series_oup.stan")
 # Set parameter values
 mu <- 0
 lambda <- 0.5
+inv_lambda <- 1/lambda
 sigma <- 0.25
 intervals <- 1:100
 
@@ -35,9 +36,12 @@ stan_data <- generate_student_set(n_series = 1,
 
 
 # Plot data
-stan_data$Y %>% plot(x = intervals, type = "l")
+# stan_data$Y %>% plot(x = intervals, type = "l")
 
 
+
+# tuner <- stan(file='stan_models/gp_prior_tune.stan' ,iter=1, warmup=0, chains=1,
+#             seed=5838298, algorithm="Fixed_param")
 
 
 
@@ -49,21 +53,21 @@ samples <- sampling(oup_model,
 
 
 # Get posterior samples
-posterior <- sapply(c("lambda", "mu", "sigma"),
+posterior <- sapply(c("inv_lambda", "mu", "sigma"),
                     function(x) rstan::extract(samples, x)) %>%
-  set_names(c("lambda", "mu", "sigma"))
+  set_names(c("inv_lambda", "mu", "sigma"))
 
 
 # Plot posterior with simulation values
-posterior_plot <- lapply(c("lambda", "mu", "sigma"), function(x) {
+posterior_plot <- lapply(c("inv_lambda", "mu", "sigma"), function(x) {
   
   p <- posterior[[x]] %>% 
     as.data.frame() %>%
     ggplot(aes(x = .)) +
     geom_density() +
     geom_vline(xintercept = eval(parse(text = x)), linetype = "dashed") +
-    labs(title = x) +
-    scale_x_continuous(limits = c(eval(parse(text = x))-1, eval(parse(text = x))+1))
+    labs(title = x)
+    
   
   
 }) 
@@ -74,7 +78,7 @@ plot_grid(posterior_plot[[1]], posterior_plot[[2]], posterior_plot[[3]], nrow = 
 
 
 # ShinyStan
-samples %>% launch_shinystan()
+# samples %>% launch_shinystan()
 
 
 

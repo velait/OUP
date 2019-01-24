@@ -2,8 +2,8 @@
 # Assume delta_t = 1 for simplicity
 
 # OUP generator
-generate_oup <- function(x0 = NULL, n = 100, lambda = .5, mu = 0, sigma = .25) {
-  
+generate_oup <- function(x0 = NULL, n = 100, lambda = .5, mu = 0, sigma = .25, seed = 1) {
+  set.seed(seed)
   kappa <- (sigma^2)/(2*lambda)
   
   # First observation
@@ -70,7 +70,7 @@ resolution <- 100
 
 
 
-# One series **************************************** ####
+## One series ************************************************* ####
  
 series <- generate_oup(n = 50)
 # marginalize over mu and sigma
@@ -93,8 +93,34 @@ lambda_marginal <- sapply(seq(0.0001, 1, length.out = resolution), function(l) {
   
 })
 
+## test likelihood for varying lambda and fixed mu, sigma ***** ####
 
-## Multiple series ********************************** ####
+# grow length of series
+lh_grid <- lapply(10*12:20, function(i) {
+  series <- generate_oup(n = i)
+  
+  single_series_lh <- sapply(seq(0.0001, 1, length.out = resolution), function(x) {
+    oup_log_likelihood(series, lambda = x, sigma = .25, mu = 0)
+  })
+  
+}) %>%
+  do.call(cbind, .) %>% 
+  as.data.frame()
+
+# normalize
+lh_grid <- apply(lh_grid, 2, FUN = function(i) {
+  i <- exp(i)
+  i/sum(i)
+})
+
+lh_grid_plot <- lh_grid %>%
+  melt %>%
+  cbind(x = rep(seq(0.0001, 1, length.out = resolution), 9)) %>%
+  ggplot(aes(x = x, y = value, color = Var2)) +
+  geom_line() +
+  scale_color_brewer(type = "seq")
+
+## Multiple series ******************************************** ####
 
 many_series <- lapply(1:20, function(i) generate_oup(n = 25)) %>% 
   do.call(rbind, .)
@@ -185,3 +211,48 @@ lambda_marginal_many <- sapply(seq(0.0001, 1, length.out = resolution), function
 })
 
 
+## test likelihood many series ******************************** ####
+
+# grow amount if series, fix length at 10
+lh_grid <- lapply(5:10, function(i) {
+  
+  # generate data
+  series <- lapply(1:i, function(x) {
+    generate_oup(n = 50, seed = x)
+  }
+  ) %>% do.call(cbind, .) %>% as.data.frame()
+  
+  
+  # lambda grid likelihoods
+  single_series_lh <- sapply(seq(0.0001, 1, length.out = resolution), function(x) {
+    
+    apply(series, 2, FUN = function(y) {
+      oup_log_likelihood(y, lambda = x, sigma = .25, mu = 0)
+    }) %>% sum
+    
+  })
+  
+}) %>%
+  do.call(cbind, .) %>% 
+  as.data.frame()
+
+# normalize
+lh_grid <- apply(lh_grid, 2, FUN = function(i) {
+  i <- exp(i)
+  i/sum(i)
+})
+
+lh_grid_plot <- lh_grid %>%
+  melt %>%
+  cbind(x = rep(seq(0.0001, 1, length.out = resolution), 6)) %>%
+  ggplot(aes(x = x, y = value, color = Var2)) +
+  geom_line() +
+  scale_color_brewer(type = "seq")
+
+
+lh_grid %>%
+  melt %>%
+  cbind(x = rep(seq(0.0001, 1, length.out = resolution), 6)) %>%
+  ggplot(aes(x = x, y = value, color = variable)) +
+  geom_line() +
+  scale_color_brewer(type = "seq")

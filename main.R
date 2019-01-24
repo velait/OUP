@@ -4,11 +4,12 @@ library(tidyverse)
 library(invgamma)
 library(reshape2)
 library(magrittr)
+library(cowplot)
 
 source("OU.functions.R")
 
 
-chains <- 2
+chains <- 1
 iter <- 2000
 
 

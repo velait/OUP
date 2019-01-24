@@ -195,6 +195,67 @@ restricted_rnorm <- function(n, mean, sd, lower = 0) {
   return(vec)
 }
 
+# Generate gaussian process set with stan
+genera_gp_set_stan <- function(n_series, alpha, rho, sigma, intervals, stan_model, seed = 1) {
+  set.seed(seed)
+  
+  x_total <- seq(from = intervals[1],
+                 to = intervals[length(intervals)],
+                 by = 0.1)
+  
+  N_total <- length(x_total)
+  
+  # Generate data with stan
+  obs <- lapply(1:n_series, function(i) {
+    
+    gp_simulator_data <- list(N = N_total, x = x_total, alpha = alpha[i], rho = rho[i], sigma = sigma[i])
+    
+    seed <- runif(1, 1, 1000)
+    
+    samples <- sampling(stan_model,
+                        data = gp_simulator_data, 
+                        iter=1,
+                        chains=1,
+                        seed=seed,
+                        algorithm="Fixed_param")
+    
+    fs <- grep("f", rownames(summary(samples)$summary), value = T)
+    ys <- grep("y", rownames(summary(samples)$summary), value = T)
+    
+    
+    df <- data.frame(f = summary(samples)$summary[fs, "mean"],
+                     y = summary(samples)$summary[ys, "mean"]) %>% 
+      set_rownames(NULL)
+    
+    
+  })
+  
+  
+  # observations
+  y <- obs %>% lapply(function(x) {
+    x[(x_total %% 1) == 0, "y"]
+  }) %>% do.call(rbind, .)    
+  
+  # latent process
+  f <- obs %>% lapply(function(x) {
+    x[(x_total %% 1) == 0, "f"]
+  }) %>% do.call(rbind, .)
+  
+  if(n_series == 1) {
+    y <- y %>% t() %>% as.vector()
+    f <- f %>% t() %>% as.vector()
+  }
+  
+  return(list(y=y,
+              f = f,
+              S=n_series,
+              x=intervals,
+              N=length(intervals),
+              alpha_values = alpha,
+              rho_values = rho,
+              sigma_values = sigma))
+}
+
 
 #### DUMP ####
 

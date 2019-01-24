@@ -30,7 +30,6 @@ functions {
   
 }
 
-
 data {
   int<lower=0> T;           //number of time points
   int<lower=0> N;           //number of series
@@ -42,7 +41,8 @@ data {
 parameters {
   
   // vector [N] lambda_raw;
-  real<lower=0, upper=1> lambda;
+  // real<lower=0> inv_lambda;
+  real<lower=0, upper=1.1> lambda;
   // real sigma_raw;
   real<lower=0> sigma;
   // real mu_raw;
@@ -73,6 +73,7 @@ transformed parameters {
   
   // real<lower=0> kappa = square(sigma)./(2*lambda);
   
+  // real lambda = 1/inv_lambda;
 
     
   
@@ -96,17 +97,17 @@ model {
 //   }
 
       for(i in 1:N) {
-      Y[i] ~ multi_student_t(student_df, rep_vector(mu, T), ((student_df-2)/student_df)*shape(student_df, sigma, lambda, time, T));
+      Y[i] ~ multi_student_t(student_df,
+      rep_vector(mu, T),
+      ((student_df-2)/student_df)*shape(student_df, sigma, lambda, time, T));
 
     }
   
   
-  // lambda ~ lognormal(0, 1);
-  // sigma ~ lognormal(0, 1);
-  // lambda ~ normal(.5, 1);
-  // lambda ~ inv_gamma(2.5, 2);
-  // sigma ~ normal(.5, 1);
-  // mu ~ normal(0, 5);
+  // lambda ~ cauchy(0, 2.5);
+  // inv_lambda ~ inv_gamma(3, 4);
+  // sigma ~ normal(0, 1);
+  // mu ~ normal(0, 1);
   
   // f_eta ~ normal(0, 1);
   
@@ -120,7 +121,7 @@ model {
   // sigma  ~ normal(0, 5);
   // sigma_raw ~ normal(0, 1);
   
-  // student_df ~ normal(0, 100);
+  
   
   //hyper priors
   // lambda_alpha ~ normal(0, 5);

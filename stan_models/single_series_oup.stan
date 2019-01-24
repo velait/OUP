@@ -39,9 +39,15 @@ data {
 
 parameters {
   
-  real<lower=0, upper=1> lambda; // mean-reversion
+  real<lower=0> lambda;        // mean-reversion
   real<lower=0> sigma;           // volatility
   real mu;                       // long-term mean
+  
+}
+
+transformed parameters {
+  
+  
   
 }
 
@@ -54,8 +60,8 @@ model {
     
     
     // Priors
-    lambda ~ inv_gamma(.1, .5);
-    sigma  ~ inv_gamma(.1, .5);
+    lambda ~ inv_gamma(10, 5);
+    sigma  ~ normal(0.5, 1);
     mu     ~ normal(0, 1);
     
 }
