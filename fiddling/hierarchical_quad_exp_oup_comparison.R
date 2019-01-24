@@ -18,7 +18,7 @@ pooled_gp_oup <- stan_model("fiddling/stan_models/fit_pooled_oup.stan")
 non_pooled_gp_oup <- stan_model("fiddling/stan_models/fit_non_pooled_oup.stan")
 hierarchical_pooled_gp_oup <- stan_model("fiddling/stan_models/fit_hierarchical_oup.stan")
 
-
+inv_rho_model <- stan_model("fiddling/stan_models/alt_models/fit_hierarchical_oup2.stan")
 
 ## parameters ************************************************************** ####
 
@@ -35,6 +35,7 @@ alpha_sd <- 0.5
 sigma <- 0.01 # measurement error
 
 parameters <- c("rho", "alpha", "sigma")
+hyper_parameters <- c("inv_rho_shape", "inv_rho_rate", "alpha_mean", "alpha_sd")
 
 ## Data ******************************************************************** ####
 
@@ -84,6 +85,7 @@ for(n_series in series_grid) {
   print(n_series)
   
   results <- list()
+  hyper_results <- list()
   
   for(n_observations in observation_grid) {
     print(n_observations)
@@ -103,7 +105,7 @@ for(n_series in series_grid) {
                                    chains=chains,
                                    init=1)
     
-    partially_pooled_samples <- sampling(hierarchical_pooled_gp_oup,
+    partially_pooled_samples <- sampling(inv_rho_model,
                                          stan_data,
                                          iter=iter,
                                          chains=chains,
@@ -139,6 +141,22 @@ for(n_series in series_grid) {
       
     }) %>%
       do.call(rbind, .)
+    
+    
+    
+    hyper_results[[n_observations %>% as.character()]] <- lapply(hyper_parameters, function(p) {
+      
+      
+      df <- summary(partially_pooled_samples)$summary[p, c("mean", "50%")]
+      
+      p <- gsub("inv_", "", p)
+      
+      data.frame(parameter = p, mean = df["mean"], mode = df["50%"]) %>% 
+        `rownames<-`(NULL)
+      
+    }) %>%
+      do.call(rbind, .)
+    
     
     # hyperparameter_results[[n_observations %>% as.character()]]  <- lapply(names(models), function(model) {
     #   
