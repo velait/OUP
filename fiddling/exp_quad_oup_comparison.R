@@ -1,7 +1,7 @@
 ## stan models ************************************************************* ####
 
 # generators
-oup_simulator <- stan_model("fiddling/simulate_gp_OUP.stan")
+oup_simulator <- stan_model("fiddling/stan_models/simulate_gp_OUP.stan")
 gp_simulator <- stan_model("fiddling/simulate_gp_exp_quad.stan")
 
 # simulate underlying process for the quantiles
@@ -26,8 +26,8 @@ x_total <- 100 * (0:(N_total - 1)) / (N_total - 1)
 # rho_true <- 1/sqrt(lambda)        # length scale (~ inv_lambda)
 # sigma_true <- 0.25   # measurement error
 
-alpha_true <- 0.5 # marginal variance (~ kappa^0.5)
-rho_true <- 1  # length scale (~ inv_lambda^0.5)
+alpha_true <- 4 # marginal variance (~ kappa^0.5)
+rho_true <- 2  # length scale (~ inv_lambda^0.5)
 sigma_true <- 1    # measurement error
 
 kappa <- alpha_true^2

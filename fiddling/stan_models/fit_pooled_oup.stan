@@ -38,10 +38,9 @@ model {
     K[n, n] = K[n, n] + sq_sigma;
   }
   
-  
   L_K = cholesky_decompose(K);
   
-  rho ~ inv_gamma(15.4, 79.4);
+  rho ~ inv_gamma(4, 10);
   alpha ~ normal(0, 1);
   sigma ~ normal(0, 1);
   

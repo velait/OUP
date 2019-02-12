@@ -18,7 +18,8 @@ data {
   int<lower=1> S; // number of series
   real x[N];      // time
   matrix[S, N] y;    // observations
-  
+  real<lower=0> est_alpha_mean;
+  real<lower=0> est_alpha_sd;
 }
 transformed data {
   vector[N] mu = rep_vector(0, N);
@@ -31,23 +32,26 @@ parameters {
 model {
   
   for(i in 1:S) {
-  matrix[N, N] L_K;
-  matrix[N, N] K = cov_exp_abs(x, alpha[i], rho[i], N);
-  real sq_sigma = square(sigma);
-  
-  // diagonal elements
-  for (n in 1:N) {
-    K[n, n] = K[n, n] + sq_sigma;
-  }
-  
-  
-  L_K = cholesky_decompose(K);
-  
-  y[i] ~ multi_normal_cholesky(mu, L_K);
-  
+    matrix[N, N] L_K;
+    matrix[N, N] K = cov_exp_abs(x, alpha[i], rho[i], N);
+    real sq_sigma = square(sigma);
+    
+    // diagonal elements
+    for (n in 1:N) {
+      K[n, n] = K[n, n] + sq_sigma;
+    }
+    
+    
+    L_K = cholesky_decompose(K);
+    
+    
+    
+    
+    y[i] ~ multi_normal_cholesky(mu, L_K);
   }
   
   rho ~ inv_gamma(4, 10);
-  alpha ~ normal(0, 1);
-  sigma ~ normal(0, 1); 
+    alpha ~ normal(est_alpha_mean, est_alpha_sd);
+    sigma ~ normal(0, 1);
+  
 }

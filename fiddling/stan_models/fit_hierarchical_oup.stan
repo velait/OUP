@@ -30,7 +30,7 @@ parameters {
   
   
   // hyperparameters
-  // real<lower=0> rho_shape;
+  real<lower=0> rho_shape;
   real<lower=0> rho_rate;
   real<lower=0> alpha_mean;
   real<lower=0> alpha_sd;
@@ -62,15 +62,15 @@ model {
   
   
   // priors
-  rho ~ inv_gamma(15.4, rho_rate);
+  rho ~ inv_gamma(rho_shape, rho_rate);
   // alpha ~ normal(alpha_mean, alpha_sd);
   alpha_raw ~ normal(0, 1);
   sigma ~ normal(0, 1);
   
   // hyperpriors
-  // rho_shape ~ normal(50, 10);
-  rho_rate ~ normal(50, 10);
-  alpha_mean ~ normal(0, 10);
-  alpha_sd ~ normal(0, 10);
+  rho_shape ~ normal(10, 5);
+  rho_rate ~ normal(50, 5);
+  alpha_mean ~ normal(0, 2);
+  alpha_sd ~ normal(0, 1);
   
 }

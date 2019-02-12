@@ -57,7 +57,7 @@ model {
   
   L_K = cholesky_decompose(K);
   
-  rho ~ inv_gamma(15.444, 79.444);
+  rho ~ inv_gamma(4, 10);
   alpha ~ normal(0, 2);
   sigma ~ normal(0, 1);
   

@@ -5,6 +5,8 @@ library(invgamma)
 library(reshape2)
 library(magrittr)
 library(cowplot)
+library(ggsci)
+library(shinystan)
 
 source("OU.functions.R")
 

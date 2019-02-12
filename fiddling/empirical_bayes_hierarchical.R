@@ -2,34 +2,22 @@
 
 # generators
 oup_simulator <- stan_model("fiddling/simulate_gp_OUP.stan")
-gp_simulator <- stan_model("fiddling/simulate_gp_exp_quad.stan")
+
 
 # simulate underlying process for the quantiles
 stan_simulator <- stan_model(file='fiddling/simu_gauss_dgp.stan')
 
 # fitters
-exp_quad_fitter <- stan_model("fiddling/fit_gp.stan")
 oup_fitter <- stan_model("fiddling/fit_oup.stan")
-fitter_list <- list(oup = oup_fitter, exp_quad = exp_quad_fitter)
 
-
-# complete, partial and non-pooled versions
-# pooled_gp_oup <- stan_model("fiddling/stan_models/fit_pooled_oup.stan")
-# non_pooled_gp_oup <- stan_model("fiddling/stan_models/fit_non_pooled_oup.stan")
-# hierarchical_pooled_gp_oup <- stan_model("fiddling/stan_models/fit_hierarchical_oup.stan")
-
-
-adaptive_pooled_gp_oup <- stan_model("fiddling/stan_models/alt_models/adaptive_fit_pooled_oup.stan")
-adaptive_non_pooled_gp_oup <- stan_model("fiddling/stan_models/alt_models/adaptive_fit_non_pooled_oup.stan")
-adaptive_hierarchical_pooled_gp_oup <- stan_model("fiddling/stan_models/alt_models/adaptive_fit_hierarchical_oup.stan")
+# complete, partial and non-pooled versions /w EMPIRICAL BAYES
+empirical_pooled_gp_oup <- stan_model("fiddling/stan_models/empirical_fit_pooled_oup.stan")
+empirical_non_pooled_gp_oup <- stan_model("fiddling/stan_models/empirical_fit_non_pooled_oup.stan")
+empirical_hierarchical_pooled_gp_oup <- stan_model("fiddling/stan_models/empirical_fit_hierarchical_oup.stan")
 
 # inv_rho_model <- stan_model("fiddling/stan_models/alt_models/fit_hierarchical_oup2.stan")
 
 ## parameters ************************************************************** ####
-
-
-# alpha = kappa^2
-# rho = (inv_lambda)^2
 
 rho_shape <- 4  # length scale
 rho_rate <- 10
@@ -41,7 +29,7 @@ sigma <- 0.25 # measurement error
 
 parameters <- c("rho", "alpha", "sigma")
 # hyper_parameters <- c("inv_rho_shape", "inv_rho_rate", "alpha_mean", "alpha_sd")
-hyper_parameters <- c("rho_shape", "rho_rate", "alpha_mean", "alpha_sd")
+hyper_parameters <- c("rho_shape", "rho_rate", "alpha_sd")
 
 ## Data ******************************************************************** ####
 
@@ -55,26 +43,30 @@ gp_data_set <- lapply(series_grid, function(n_series) {
   
   obs_data <- lapply(observation_grid, function(n_observations) {
     print(paste0(n_observations, " observations"))
-
-  # Data
-  seed <- n_series*n_observations + 2
-  set.seed(seed)
-  
-  rho_true <- rinvgamma(n_series, shape = rho_shape, rate = rho_rate)       # marginal variance (~ kappa^.5)
-  alpha_true <- restricted_rnorm(n_series, alpha_mean, alpha_sd, lower = 0)        # length scale (~ inv_lambda^.5)
-  sigma_true <- rep(sigma, n_series)                              # measurement error
-  
-  dat <- genera_gp_set_stan(n_series = n_series,
-                                            alpha = alpha_true,
-                                            rho = rho_true, 
-                                            sigma = sigma_true,
-                                            intervals = 1:n_observations,
-                                            stan_model = oup_simulator,
-                                            seed = seed)
-  
-  return(dat)
-
-
+    
+    # Data
+    seed <- n_series*n_observations + 2
+    set.seed(seed)
+    
+    rho_true <- rinvgamma(n_series, shape = rho_shape, rate = rho_rate)       # marginal variance (~ kappa^.5)
+    alpha_true <- restricted_rnorm(n_series, alpha_mean, alpha_sd, lower = 0)        # length scale (~ inv_lambda^.5)
+    sigma_true <- rep(sigma, n_series)                              # measurement error
+    
+    dat <- genera_gp_set_stan(n_series = n_series,
+                              alpha = alpha_true,
+                              rho = rho_true, 
+                              sigma = sigma_true,
+                              intervals = 1:n_observations,
+                              stan_model = oup_simulator,
+                              seed = seed)
+    
+    # Add estimated marginal sd and its variance for empirical Bayes
+    dat$est_alpha <- sd(dat$y)
+    dat$est_alpha_var <- apply(dat$y, 1, FUN = sd) %>% var
+    
+    return(dat)
+    
+    
   }) %>% set_names(as.character(observation_grid))
   
   data[[as.character(n_series)]] <- obs_data
@@ -103,19 +95,19 @@ for(n_series in series_grid) {
     stan_data <- gp_data_set[[as.character(n_series)]][[as.character(n_observations)]]
     
     # Stan samples ************************************************
-    pooled_samples <- sampling(pooled_gp_oup,
+    pooled_samples <- sampling(empirical_pooled_gp_oup,
                                stan_data,
                                iter=iter,
                                chains=chains,
                                init=1)
     
-    non_pooled_samples <- sampling(non_pooled_gp_oup,
+    non_pooled_samples <- sampling(empirical_non_pooled_gp_oup,
                                    stan_data,
                                    iter=iter,
                                    chains=chains,
                                    init=1)
     
-    partially_pooled_samples <- sampling(hierarchical_pooled_gp_oup,
+    partially_pooled_samples <- sampling(empirical_hierarchical_pooled_gp_oup,
                                          stan_data,
                                          iter=iter,
                                          chains=chains,
@@ -139,7 +131,7 @@ for(n_series in series_grid) {
       
       lapply(parameters, function(p) {
         
-        p_values <- stan_data[[grep(p, names(stan_data))]]
+        p_values <- stan_data[[grep(p, names(stan_data))[1]]]
         
         get_IQRs(models[[model]] , p, p_values)
         
@@ -204,9 +196,11 @@ hyper_results <- hyper_loop_results %>%
   do.call(rbind, .) %>% 
   set_rownames(NULL)
 
-save(results, hyper_results, gp_data_set, file = "fiddling/hierarchical_test_4_10.Rdata")
-# load(file = "fiddling/hierarchical_test2.Rdata")
+# save(results, hyper_results, gp_data_set, file = "fiddling/fixed_alpha_hierarchical.Rdata")
+load(file = "fiddling/fixed_alpha_hierarchical.Rdata")
 
+
+# Class to numerical
 for(col in c("mean_sd", "sd", "simulation_value", "IQR50_lower", "IQR50_upper", "mean_IQR", "IQR_min", "mean", "median")) {
   results[, col] <- results[, col] %>% as.character() %>% as.numeric()
 }
@@ -244,13 +238,13 @@ modelwise_ratio_plots <- lapply(c("partially", "pooled", "non_pooled"), function
   
   
   ggplot() +
-    geom_line(data = df, aes(x = alpha, y = rho, group = index)) +
-    geom_point(data = df, aes(x = alpha, y= rho, color = type)) +
+    geom_line(data = df, aes(y = alpha, x = rho, group = index)) +
+    geom_point(data = df, aes(y = alpha, x= rho, color = type)) +
     facet_wrap(c("n_observations", "n_series"), labeller = "label_both", ncol=length(series_grid)) +
     theme_bw() +
     labs(title = paste0("Pooling: ", x),
-         x = "Alpha (marginal standard deviation)", 
-         y = "Rho (length scale)")
+         y = "Alpha (marginal standard deviation)", 
+         x = "Rho (length scale)")
   
 })
 
@@ -305,7 +299,7 @@ modelwise_ratio_comparison_plots <- lapply(c("partially", "pooled", "non_pooled"
   
 }) %>% 
   set_names(c("partially", "pooled", "non_pooled"))
-    
+
 
 # results_store <- results
 
@@ -322,7 +316,7 @@ modelwise_estimate_panels <- lapply(parameters, function(par) {
     geom_line(data = df, aes(x=rank, y=simulation_value)) +
     geom_errorbar(data = df %>% filter(model != "pooled"),
                   aes(x=rank, ymin=IQR50_lower, ymax=IQR50_upper, color = model, width = 0.25),
-                  position = "dodge") +
+                  position = "dodge", size = 1) +
     facet_wrap(c( "n_observations", "n_series"), labeller = "label_both", ncol = length(series_grid)) +
     labs(x="Series", y="Posterior estimate", title=par) +
     guides(color=guide_legend("Model")) +
@@ -443,7 +437,7 @@ hyper_parameter_map_estimate_plot <- lapply(c("alpha", "rho"), function(par) {
   
   ggplot()+
     geom_line(data = prior_df, aes(x = x, y = y), color = "black", linetype = "dashed") +
-  geom_line(data = hyper_parameter_map_estimate_plot_data[[par]], 
+    geom_line(data = hyper_parameter_map_estimate_plot_data[[par]], 
               aes(x = x, y = y, color = as.factor(n_series))) +
     facet_wrap(c("n_observations"), labeller = "label_both") +
     theme_bw() +

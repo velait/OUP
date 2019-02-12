@@ -1,12 +1,13 @@
-# Single series scan
+#### Single series scan
 
-oup_fitter <- stan_model("fiddling/stan_models/fit_oup.stan")
+# OUP simulator
+oup_simulator <- stan_model("fiddling/stan_models/simulate_gp_OUP.stan")
+
+# OUP fitter; alpha is given as data
 fixed_alpha_oup_fitter <- stan_model("fiddling/stan_models/fit_oup_fixed_alpha.stan")
-fitter <- oup_fitter
 
 # simulate underlying process for the quantiles
 stan_simulator <- stan_model(file='fiddling/stan_models/simu_gauss_dgp.stan')
-oup_simulator <- stan_model("fiddling/stan_models/simulate_gp_OUP.stan")
 
 ## Data ****************************** ####
 
@@ -37,9 +38,9 @@ single_data_set <- lapply(rho_grid, function(r) {
                         algorithm="Fixed_param")
     
     samples
-      
+    
   }) %>% set_names(alpha_grid %>% as.character())
-
+  
   
   res
   
@@ -68,33 +69,33 @@ single_simulated_data <- lapply(rho_grid, function(r) {
   res
   
 }) %>% set_names(alpha_grid %>% as.character())
-  
+
 
 # Get the underlying data generating process
 single_data_process_plot_data <- lapply(rho_grid, function(r) { 
   
   lapply(alpha_grid, function(a) {
+    
+    
+    
+    f_data <- list(sigma=sigma,
+                   N=n_total_samples,
+                   f=single_simulated_data[[r]][[a]] %>% pull(f))
+    
+    
+    dgp_fit <- sampling(stan_simulator, data=f_data, iter=1000, warmup=0,
+                        chains=1, seed=5838298, refresh=1000, algorithm="Fixed_param")
+    
+    df <- summary(dgp_fit)$summary[, c("mean", "2.5%", "25%", "50%", "75%", "97.5%")] %>% 
+      as.data.frame()
+    
+    df <- df[1:(nrow(df) - 1), ]
+    
+    df <- df %>% mutate(x = x_total)
+    return(df)
+  }) %>% 
+    set_names(alpha_grid %>% as.character)
   
-  
-  
-  f_data <- list(sigma=sigma,
-                 N=n_total_samples,
-                 f=single_simulated_data[[r]][[a]] %>% pull(f))
-  
-  
-  dgp_fit <- sampling(stan_simulator, data=f_data, iter=1000, warmup=0,
-                      chains=1, seed=5838298, refresh=1000, algorithm="Fixed_param")
-  
-  df <- summary(dgp_fit)$summary[, c("mean", "2.5%", "25%", "50%", "75%", "97.5%")] %>% 
-    as.data.frame()
-  
-  df <- df[1:(nrow(df) - 1), ]
-  
-  df <- df %>% mutate(x = x_total)
-  return(df)
-}) %>% 
-  set_names(alpha_grid %>% as.character)
-
 }) %>% 
   set_names(rho_grid %>% as.character)
 
@@ -115,7 +116,7 @@ neat_single_data_process_plot_data <- lapply(rho_grid, function(r) {
 single_process_plots <- lapply(rho_grid, function(r) {
   lapply(alpha_grid, function(a) {
     
-   p <-  ggplot(neat_single_data_process_plot_data %>% filter(rho == r, alpha == a)) +
+    p <-  ggplot(neat_single_data_process_plot_data %>% filter(rho == r, alpha == a)) +
       geom_ribbon(aes(x = x, ymin = low2.5, ymax = high97.5), fill = "darkgreen") +
       geom_ribbon(aes(x = x, ymin = low25, ymax = high75), fill = "chartreuse") +
       geom_line(aes(x = x, y = mean))
@@ -152,28 +153,29 @@ single_process_results <- lapply(rho_grid, function(r) {
     dat <- single_simulated_data[[r]][[a]] %>% 
       filter((x%%1==0))
     
-    dat <- list(N = nrow(dat), y = dat$y, x = dat$x)
+    dat <- list(N = nrow(dat),
+                y = dat$y,
+                x = dat$x, 
+                alpha = a)
     
     
-    samples <- sampling(fitter,
-            dat,
-            iter=iter,
-            chains=chains,
-            init=1)
+    samples <- sampling(fixed_alpha_oup_fitter,
+                        dat,
+                        iter=iter,
+                        chains=chains,
+                        init=1)
     
-    parameters <- c("rho", "alpha", "sigma", "oup_sigma")
-    
-    summary(samples)$summary[parameters, c("2.5%", "50%", "97.5%")] %>% 
+    summary(samples)$summary[c("rho", "sigma"), c("2.5%", "50%", "97.5%")] %>% 
       as.data.frame() %>% 
-      cbind(parameter = parameters, true_value = c(r, a, sigma, sqrt(2)*a/r)) %>% 
-      set_colnames(c("lower2.5", "mode", "upper97.5", "parameter", "true_value"))
+      cbind(parameter = c("rho", "sigma"), true_value = c(r, sigma), alpha = a) %>% 
+      set_colnames(c("lower2.5", "mode", "upper97.5", "parameter", "true_value", "alpha"))
     
   })
   
 })
 
-# save(single_process_results, file = "fiddling/fixed_alpha_single_series_scan_results.Rdata")
-# load(file = "fiddling/results/fixed_alpha_single_series_scan_results.Rdata")
+# save(single_process_results, file = "fiddling/results/fixed_alpha_single_series_scan_results.Rdata")
+# load(file = "fiddling/single_series_scan_results.Rdata")
 
 
 ## Plots ****************************** ####
@@ -181,31 +183,38 @@ single_process_results <- lapply(single_process_results, function(x) {
   x %>% do.call(rbind, .)
 }) %>%
   do.call(rbind, .) %>% 
-  cbind(index = rep(1:(length(rho_grid)*length(alpha_grid)), each = length(parameters)))
+  cbind(index = rep(1:100, each = 2))
 
 
 
 df <- single_process_results %>% 
-  filter(parameter == "rho")
+  filter(parameter == "sigma")
 
 
-  ggplot(data = df) +
-    geom_point(aes(x = index, y = mode)) +
-    geom_point(aes(x = index, y = true_value), color = "red") +
-    geom_errorbar(aes(x = index, ymin = lower2.5, ymax = upper97.5)) +
-    labs(title = "rho 95% estimates; \n red point are true values; \n index 30-40 --> rho = 3, alpha = 1-10 etc.")
+ggplot() +
+  geom_point(data = df, aes(x = index, y = mode)) +
+  geom_point(data = df, aes(x = index, y = true_value), color = "red")
 
-  
+
+ggplot(data = df) +
+  geom_point(aes(x = index, y = mode)) +
+  geom_point(aes(x = index, y = true_value), color = "red") +
+  geom_errorbar(aes(x = index, ymin = lower2.5, ymax = upper97.5)) +
+  labs(title = "sigma 95% estimates; \n red point are true values; \n index 30-40 --> rho = 3, alpha = 1-10 etc.")
+
+
 ## length scale/variance ratio plot ************************
-true_ratio <- single_process_results[single_process_results$parameter == "rho", "true_value"]/single_process_results[single_process_results$parameter == "alpha", "true_value"]
-  
-estimate_ratio <- single_process_results[single_process_results$parameter == "rho", "mode"]/single_process_results[single_process_results$parameter == "alpha", "mode"]
-  
+true_ratio <- single_process_results[single_process_results$parameter == "rho", "true_value"]/single_process_results[single_process_results$parameter == "rho", "alpha"]
+
+estimate_ratio <- single_process_results[single_process_results$parameter == "rho", "mode"]/single_process_results[single_process_results$parameter == "rho", "alpha"]
+
 
 ratio_df <- data.frame(true_ratio = true_ratio,
                        estimate_ratio = estimate_ratio,
                        true_rho = single_process_results[single_process_results$parameter == "rho", "true_value"],
-                       true_alpha = single_process_results[single_process_results$parameter == "alpha", "true_value"])
+                       true_alpha = single_process_results[single_process_results$parameter == "rho", "alpha"],
+                       estimate_rho = single_process_results[single_process_results$parameter == "rho", "mode"],
+                       index = 1:100)
 
 
 ratio_df %>% ggplot(aes(x = true_ratio, y = estimate_ratio)) +
@@ -224,71 +233,3 @@ ratio_df %>% ggplot(aes(x = true_ratio, y = estimate_ratio, color = as.factor(tr
 
 
 
-## Rho/alpha space prior, on top true values and estimates
-
-# prior
-old_prior_val <- data.frame(rho = rep(1:100/10, 50),
-                            alpha = rep(1:50/10, each = 100),
-                            value = NA)
-
-for(alpha in 1:50/10) {
-  
-  for(rho in 1:100/10) {
-    
-    condition <- rho == pc_prior_val$rho & alpha == pc_prior_val$alpha
-    
-    # old_prior_val[condition, "value"] <- dinvgamma(rho, 4, 10)*dnorm(alpha, 0, 1)
-    old_prior_val[condition, "value"] <- dinvgamma(rho, 2, 5)*dnorm(alpha, 0, 1)
-    # old_prior_val[condition, "value"] <- dnorm(alpha, 0, 1)
-    # old_prior_val[condition, "value"] <- rho^5*dexp(rho, 1)*dnorm(alpha, 0, 1)
-    
-  }
-  
-}
-
-
-line_data <- rbind(cbind(single_process_results[c(2, 4, 6)] %>%
-                           spread(key = parameter, value = mode), type = "estimate"), cbind(single_process_results[4:6] %>%
-                                                                                              spread(key = parameter, value = true_value), type = "true"))
- 
-line_data$rho <- ifelse(line_data$rho > 100, 100, line_data$rho)
-
-
-  ggplot() +
-  geom_contour(data = old_prior_val,
-               aes(x = rho, y = alpha,  z = value)) +
-    geom_line(data = line_data, aes(x = rho, y = alpha, group = index)) +
-  geom_point(data = line_data, aes(x = rho, y = alpha, color = type)) +
-    scale_color_startrek() +
-  theme_bw() +
-    coord_fixed()
-
-  
-## Fixed alpha ratio plot
-
-  true_ratio <- single_process_results[single_process_results$parameter == "rho", "true_value"]/single_process_results[single_process_results$parameter == "rho", "alpha"]
-  
-  estimate_ratio <- single_process_results[single_process_results$parameter == "rho", "mode"]/single_process_results[single_process_results$parameter == "rho", "alpha"]
-  
-  
-  ratio_df <- data.frame(true_ratio = true_ratio,
-                         estimate_ratio = estimate_ratio,
-                         true_rho = single_process_results[single_process_results$parameter == "rho", "true_value"],
-                         true_alpha = single_process_results[single_process_results$parameter == "rho", "alpha"])
-  
-  
-  ratio_df %>% ggplot(aes(x = true_ratio, y = estimate_ratio)) +
-    geom_point() +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
-    labs(title = "Posterior model ratio vs. simulation value ratio")
-  
-  
-  
-  
-  ratio_df %>% ggplot(aes(x = true_ratio, y = estimate_ratio, color = as.factor(true_rho))) +
-    geom_point() +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
-    labs(title = "Posterior model ratio vs. simulation value ratio") +
-    facet_wrap(c("true_alpha"), labeller = "label_both")
-  
-  

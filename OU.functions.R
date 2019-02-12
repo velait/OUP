@@ -1,7 +1,33 @@
 # Functions
 
-# Covariance matrix
+# Generate 2d oup
+oup_2d <- function(length = 100, Y0, mu, B, G) {
+  
+  Y <- matrix(NA, nrow = length, ncol = 2)
+  Y[1, ] <- Y0
+  exp_mB <- expm(-B) %>% as.matrix()
+  
+  for(i in 2:length) {
+    
+    
+    Mean <- mu + exp_mB%*%(Y[i-1, ] - mu)
+    Cov <- G - exp_mB%*%G%*%exp_mB %>%
+      as.matrix()
+    
+    
+    
+    Y[i, ] <- rmvnorm(n = 1, mean = Mean, sigma = Cov)
+    
+  }
+  
+  colnames(Y) <- c("x", "y")
+  
+  return(Y)
+}
 
+
+
+# Covariance matrix
 covariance <- function(lambda, sigma, intervals) {
   n <- length(intervals)
   kernel <- matrix(NA, nrow=length(intervals), ncol=length(intervals))
@@ -256,6 +282,50 @@ genera_gp_set_stan <- function(n_series, alpha, rho, sigma, intervals, stan_mode
               sigma_values = sigma))
 }
 
+
+# One long into many short
+divide_long_series <- function(long_data, into = 10) {
+  
+  if(length(long_data$y) %% into != 0) {
+    stop(paste0("Number of observations not divisible with ", into))
+  }
+  
+  y <- long_data$y %>% 
+    matrix(nrow = into, byrow = TRUE)
+  
+  x <- 1:ncol(y)
+  
+  N <- ncol(y)
+  
+  S <- into
+  
+  return(list(N = N, S = S, x = x, y = y))  
+}
+
+# Prior data
+
+prior_data <- function(y_shape = "normal", y1, y2, x_shape = "invgamma", x1, x2, x = 1:100/10, y = 1:100/10) {
+  
+  prior <- data.frame(x = rep(x, length(y)),
+                      y = rep(y, each = length(x)),
+                      value = NA)
+  
+  for(i in x) {
+    print(paste0(which(i == x), "/", length(x)))
+    for(j in y) {
+      
+      condition <- i == prior$x & j == prior$y
+      prior[condition, "value"] <- dinvgamma(i, x1, x2)*dnorm(j, y1, y2)
+      
+      
+    }
+  }
+  
+  
+  return(prior)
+  
+  
+}
 
 #### DUMP ####
 

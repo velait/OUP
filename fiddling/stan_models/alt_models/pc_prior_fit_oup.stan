@@ -1,5 +1,5 @@
 functions {
-    matrix cov_exp_abs(real[] time, real alpha, real rho, int N){
+  matrix cov_exp_abs(real[] time, real alpha, real rho, int N){
     matrix[N, N] covariance;
     
     
@@ -20,6 +20,10 @@ data {
 }
 transformed data {
   vector[N] mu = rep_vector(0, N);
+  
+  real lambda1 = -log(0.01)*sqrt(2*10);
+  real lambda2 = -log(0.01)/10.0;
+  
 }
 parameters {
   real<lower=0> rho;
@@ -35,13 +39,22 @@ model {
   for (n in 1:N) {
     K[n, n] = K[n, n] + sq_sigma;
   }
-    
+  
   
   L_K = cholesky_decompose(K);
-  
-  rho ~ inv_gamma(15.444, 79.444);
-  alpha ~ normal(0, 1);
-  sigma ~ normal(0, 1);
-  
+
   y ~ multi_normal_cholesky(mu, L_K);
+  
+  // priors
+  sigma ~ normal(0, 1);
+  target += log(lambda1) + log(lambda2) -(3.0/2.0)*log(rho) - lambda1*sqrt(2*rho) - lambda2*alpha;
+  
+  
+  
+}
+
+generated quantities {
+  
+  real oup_sigma = sqrt(2)*alpha/rho;
+  
 }

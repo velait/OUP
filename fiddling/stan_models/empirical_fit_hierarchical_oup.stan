@@ -19,49 +19,35 @@ data {
   real x[N];      // time
   matrix[S, N] y;    // observations
   
+  real<lower=0> est_alpha_mean;
+  real<lower=0> est_alpha_sd;
+  
 }
-
 transformed data {
   vector[N] mu = rep_vector(0, N);
 }
-
 parameters {
-  vector<lower=0> [S] inv_rho;
-  vector<lower=0> [S] alpha_raw;
+  vector<lower=0> [S] rho;
+  vector<lower=0> [S] alpha;
   real<lower=0> sigma;
   
   
   // hyperparameters
-  real<lower=0> alpha_mean;
-  real<lower=0> alpha_sd;
-  // real<lower=0> inv_rho_shape;
-  // real<lower=0> inv_rho_rate;
+  real<lower=0> rho_shape;
+  real<lower=0> rho_rate;
+  // real<lower=0> alpha_sd;
   
-  real<lower=0> inv_rho_mean;
-  real<lower=0> inv_rho_var;
   
 }
 
 transformed parameters{
   
-  // non-center alpha
-  vector<lower=0> [S] alpha = alpha_mean + alpha_sd*alpha_raw;
+  // vector<lower=0> [S] alpha = est_alpha + sqrt(est_alpha_var)*alpha_raw;
   
-  real<lower=0> inv_rho_shape = square(inv_rho_mean)/inv_rho_var;
-  real<lower=0> inv_rho_rate = inv_rho_mean/inv_rho_var;
-  
-  // real<lower=0> inv_rho_mean = inv_rho_shape/inv_rho_rate;
-  // real<lower=0> inv_rho_var = inv_rho_shape/square(inv_rho_rate);
-  
-  vector<lower=0> [S] rho = 1 ./ inv_rho;
-
 }
 model {
   
   for(i in 1:S) {
-    
-    // real rho = pow(inv_rho[i], -1);
-    
     matrix[N, N] L_K;
     matrix[N, N] K = cov_exp_abs(x, alpha[i], rho[i], N);
     real sq_sigma = square(sigma);
@@ -79,19 +65,15 @@ model {
   
   
   // priors
-  inv_rho ~ gamma(inv_rho_shape, inv_rho_rate);
-  // alpha ~ normal(alpha_mean, alpha_sd);
-  alpha_raw ~ normal(0, 1);
+  rho ~ inv_gamma(rho_shape, rho_rate);
+  alpha ~ normal(est_alpha_mean, est_alpha_sd);
+  // alpha_raw ~ normal(0, 1);
   sigma ~ normal(0, 1);
   
   // hyperpriors
-  
-  // inv_rho_shape ~ normal(50, 10);
-  inv_rho_mean ~ normal(5, 2);
-  inv_rho_var ~ normal(0, 2);
-  
-  
-  alpha_mean ~ normal(0, 10);
-  alpha_sd ~ normal(0, 10);
-  
+  rho_shape ~ normal(10, 5);
+  rho_rate ~ normal(50, 5);
+  // alpha_mean ~ normal(est_alpha, est_alpha_var);
+  // alpha_sd ~ normal(0, 1);
+  // 
 }
