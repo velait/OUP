@@ -29,7 +29,7 @@ rho_rate <- c(30, 60, 30, 80)
 alpha_mean <- c(1, 1, 4, 4)    # marginal variance
 alpha_sd <- c(0.5, 0.5, 0.5, 0.5)
 
-sigma <- 0.25 # measurement error
+sigma <- 0.01 # measurement error
 
 parameters <- c("rho", "alpha", "sigma")
 # hyper_parameters <- c("inv_rho_shape", "inv_rho_rate", "alpha_mean", "alpha_sd")
@@ -38,8 +38,9 @@ hyper_parameters <- c("rho_shape", "rho_rate")
 seed <- 11235
 ## Data ******************************************************************** ####
 
-n_series <- 100
-n_observations <- 5
+n_series <- 50
+n_observations <- 10
+intervals <- 5*1:n_observations
 
 gp_data_set <- lapply(1:length(rho_shape), function(i) {
   
@@ -51,7 +52,7 @@ gp_data_set <- lapply(1:length(rho_shape), function(i) {
                             alpha = alpha_true,
                             rho = rho_true, 
                             sigma = sigma_true,
-                            intervals = 1:n_observations,
+                            intervals = intervals,
                             stan_model = oup_simulator,
                             seed = seed)
   
@@ -205,8 +206,10 @@ hyper_results <- hyper_loop_results %>%
   do.call(rbind, .) %>% 
   set_rownames(NULL)
 
-save(results, hyper_results, gp_data_set, file = "fiddling/results/empirical_vs_full_hierarchical_100_series_5_samples.Rdata")
+save(results, hyper_results, gp_data_set, file = "fiddling/results/empirical_vs_full_50_10_sparse5.Rdata")
 # load(file = "fiddling/results/empirical_vs_full_hierarchical.Rdata")
+
+
 
 
 # Class to numerical
@@ -222,11 +225,11 @@ for(col in c("mean_sd", "sd", "simulation_value", "IQR50_lower", "IQR50_upper", 
 
 ## Modelwise scatter plots: posterior mean vs. simulation value; length scale/alpha ratios
 modelwise_ratio_plots <- lapply(c("partially", "pooled", "non_pooled"), function(x) {
-  
-  
-  df <- results %>% 
+
+
+  df <- results %>%
     filter(pooling == x)
-  
+
   rho_values <- df %>% filter(parameter == "rho")
   rho_values <- rbind(data.frame(rho = rho_values$mean,
                                  index = rho_values$index,
@@ -237,24 +240,24 @@ modelwise_ratio_plots <- lapply(c("partially", "pooled", "non_pooled"), function
                                  type = rep("simulation_value", nrow(rho_values)),
                                  n_series = rho_values$n_series,
                                  n_observations = rho_values$n_observations))
-  
+
   alpha_values <- df %>% filter(parameter == "alpha")
   alpha_values <- rbind(data.frame(alpha = alpha_values$mean),
                         data.frame(alpha = alpha_values$simulation_value))
-  
+
   df <- cbind(rho_values, alpha_values)
-  
-  
+
+
   ggplot() +
     geom_line(data = df, aes(y = alpha, x = rho, group = index)) +
     geom_point(data = df, aes(y = alpha, x= rho, color = type)) +
     facet_wrap(c("n_observations", "n_series"), labeller = "label_both", ncol=length(series_grid)) +
     theme_bw() +
     labs(title = paste0("Pooling: ", x),
-         y = "Alpha (marginal standard deviation)", 
+         y = "Alpha (marginal standard deviation)",
          x = "Rho (length scale)")
-  
-  
+
+
 })
 )
 
@@ -318,23 +321,21 @@ modelwise_estimate_panels <- lapply(parameters, function(par) {
   
   df <- results %>% 
     filter(parameter == par) %>% 
-    group_by(model, n_observations, n_series) %>% 
-    mutate(rank = rank(simulation_value))
+    group_by(model, set, pooling) %>% 
+    mutate(rank = rank(simulation_value)) %>% 
+    ungroup()
   
   p <- df %>% 
     ggplot()  + 
     geom_line(data = df, aes(x=rank, y=simulation_value)) +
-    geom_errorbar(data = df %>% filter(model != "pooled"),
+    geom_errorbar(data = df %>% filter(pooling == "partially"),
                   aes(x=rank, ymin=IQR50_lower, ymax=IQR50_upper, color = model, width = 0.25),
                   position = "dodge", size = 1) +
-    facet_wrap(c( "n_observations", "n_series"), labeller = "label_both", ncol = length(series_grid)) +
-    labs(x="Series", y="Posterior estimate", title=par) +
+    facet_wrap(c( "set")) +
+    labs(x="Series", y="Posterior estimate", title=paste0(par, "; ", df$n_series[1], " series, ", df$n_observations[1], " observations")) +
     guides(color=guide_legend("Model")) +
     scale_color_manual(values = c("#999999", "#E69F00"))+
     theme_bw()
-  
-  # Add complete pooling estimate
-  p <- p + geom_line(data = df %>% filter(model == "pooled"), aes(x = rank, y = median), linetype ="dashed")
   
   return(p)
   

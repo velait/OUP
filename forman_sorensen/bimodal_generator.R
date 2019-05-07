@@ -1,14 +1,40 @@
 # bimodality ala Forman
+library(KScorrect)
 
 
 rho <- 5
+sigma <- 0.01
 alpha <- 1
-sigma <- 1
-n_observations <- 100
 n_total_samples <- 1001
-x_total <- 1000 * (0:(n_total_samples - 1)) / (n_total_samples - 1)
-seed <- sample(1:100, 1)
+x_total <- seq(from = 0, to = 1000,length.out = n_total_samples)
+# seed <- sample(1:100, 1)
+# 
 
+
+mix_mean = c(1, 3)
+mix_sd = c(.2, .5)
+mix_pro = c(.5, .5)
+
+transformator <- function(x, alpha, mix_mean, mix_pro) {
+  
+  qmixnorm(pnorm(x, 0, alpha),
+           mean = mix_mean, 
+           sd = mix_sd,
+           pro = mix_pro)
+  
+}
+
+marginal_distributions <- data.frame(x = -500:500/100) %>% 
+  mutate(oup = dnorm(x, 0, alpha),
+         bimodal = dmixnorm(x, mix_mean, mix_sd, mix_pro))
+
+## Stan models ******************** ####
+
+# Simulator
+oup_simulator <- stan_model("fiddling/stan_models/simulate_gp_OUP.stan")
+
+
+## Data *************************** ####
 # Simulate data (including hold out data)
 single_data_set <- lapply(rho, function(r) {
   
@@ -29,62 +55,45 @@ single_data_set <- lapply(rho, function(r) {
     
     samples
     
-  }) %>% set_names(alpha_grid %>% as.character())
+  }) 
   
   
   res
   
-}) %>% set_names(rho_grid %>% as.character())
+})
 
 
 
-processes <- data.frame(x =x_total, y = summary(single_data_set[[1]][[1]])$summary[ grepl("f", rownames(summary(single_data_set[[1]][[1]])$summary)), "mean"]
+processes <- data.frame(x = x_total,
+                        y = summary(single_data_set[[1]][[1]])$summary[ grepl("f", rownames(summary(single_data_set[[1]][[1]])$summary)), "mean"]
 ) %>% 
   `rownames<-`(NULL)
 
 
-x_grid <- -500:500/100
-distributions <- data.frame(x = x_grid, y = dnorm(x_grid, 0, 1), bi = bimodal_distribution(x_grid))
-
-
-
-transformator <- function(x) {
-  
-  qmixnorm(pnorm(x, 0, alpha),mean = c(3, 5), sd = c(0.1, 1), pro = c(.9, .1))
-  
-}
-
 
 processes <- processes %>% 
-  mutate(bi = transformator(y))
+  mutate(bi = transformator(y, alpha, mix_mean, mix_pro)) %>% 
+  set_colnames(c("x", "oup", "bimodal"))
 
 
+# plot process
 processes %>% 
   ggplot() +
-  geom_line(aes(x = x, y = y),color = "red", alpha = .5) +
-  geom_line(aes(x = x, y = bi))
+  geom_line(aes(x = x, y = oup),color = "red", alpha = .5) +
+  geom_line(aes(x = x, y = bimodal)) +
+  labs(subtitle = "Red = OUP; Black = transformed diffusion",
+       y = "Value", x = "Time") +
+  theme_bw(15)
 
-
-
-
-# bimodal_quantile <- function(x) {
-#   
-#   # sapply(1:length(x), function(i) {
-#   #   
-#   #   return(sum(x[1:i]))
-#   #   
-#   # })
-#   
-#   
-#   
-# }
 # 
 # 
+# # Plot distributions
+# processes %>%
+#   melt(id.var = "x") %>%
+#   ggplot(aes(x = value, fill = variable)) +
+#   geom_histogram(alpha = .5, color = "black", position = "identity") +
+#   scale_fill_tron() +
+#   geom_line(data = marginal_distributions %>% melt(id.var = "x"), aes(x = x, y = value*400, color = variable)) +
+#   scale_y_continuous(sec.axis = sec_axis(~./400, name = "Density"))
 # 
-# bimodal_distribution <- function(x) {
-#   
-#   y <- dnorm(x, -1, .5) + dnorm(x, 1, .5)
-#   
-#   return(y/sum(y))
-#   
-# }
+

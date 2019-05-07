@@ -1,5 +1,296 @@
 # Functions
 
+## Toy data ****************** ####
+
+# Error function, adds stochasticity
+errorer <- function(x) {
+  
+  sqrt(abs(x))*rnorm(1, 0, 0.05)
+  
+}
+
+# Hill function
+f_hill <- function(y, K, p = 2){
+  
+  d <- length(y)
+  
+  f <- sapply(1:d, function(i) {
+    
+    sapply(1:d, function(k) {
+      ifelse(i == k, 1, 
+             (K[i, k]^p)/(K[i, k]^p + y[k]^p))
+    }) %>% prod()
+    
+  })
+  
+  return(f)
+} 
+
+# Toy model from "Multistability and the.... "; n species
+toy_model <- function(times, y, parms) {
+  
+  f <- f_hill(y = y, K)
+  
+  dy <- y*(b*f - k*y)
+  
+  list(dy)
+}
+
+# Plot simulated dynamics
+plot_dynamics <- function(data, time_col = "time", facet = FALSE) {
+  
+  p <- data %>% 
+    melt(id.vars = time_col) %>% 
+    ggplot(aes(x = get(time_col), y = value, color = variable)) + 
+    geom_line() +
+    labs(x = "Time", y = "", subtitle = "Toy model") +
+    theme(legend.title=element_blank())
+  
+  if(isTRUE(facet)) {
+    p <- p + facet_wrap(~variable)
+  }
+  
+  p
+  
+}
+
+# Get spefic species data
+get_species <- function(old_data, new_data,
+                        species, time_col = "time") {
+  
+  news <- new_data[, grep(paste0(species, collapse = "|"),
+                          colnames(new_data))]
+  
+  if(is.null(old_data)) {
+    old_data <- cbind(new_data[, time_col], news)
+  } else {
+    old_data <- cbind(old_data, news)
+  }
+  
+  old_data <- old_data %>% 
+    set_colnames(c("time", paste0("S", 1:(ncol(old_data) - 1))))
+  
+}
+
+toy_data <- function(n_species = 3, times = seq(from = 0, to = 100, by = 0.1), inits = "random", stochastic = TRUE) {
+  
+  ## Parameters ********************************
+  
+  # death rate
+  # k <- runif(n_species, min = .85, max = 1.15)
+  k <- rep(1, n_species)  
+  # growth rate
+  b <- runif(n_species, min = .85, max = 1.15)
+  
+  # inhibition matrix 
+  K <- matrix(rnorm(n_species^2, .75, .2) %>% round(2),
+              n_species, n_species, byrow = T)
+  # K <- rep(0.1, n_species^2) %>% matrix(n_species, n_species, byrow = T)
+  K <- K - K*diag(n_species)
+  
+  
+  ## Initial values ***************************
+  x <- matrix(NA, length(times), n_species + 1)
+  if(inits == "random") {
+    x[1, ] <- c(0, sample(1:10/10, n_species, replace = T))
+    
+  } else {
+    x[1, ] <- c(0, inits)
+  }
+  
+  
+  ## Generation ********************************
+  toy_model <- function(times, y, parms) {
+    
+    f <- f_hill(y = y, K)
+    
+    dy <- y*(b*f - k*y)
+    
+    list(dy)
+  }
+  
+  for(i in 2:length(times)) {
+    
+    out <- ode(times = times[(i-1):i],
+               y = x[i-1, -1],
+               func = toy_model,
+               parms = NULL)
+    
+    x_new <- out[2, 2:ncol(out)] 
+    
+    if(stochastic) {
+      x_new <- x_new + sapply(x_new + 0.01, errorer)
+    }
+    
+    x_new <- ifelse(x_new < 0, 0, x_new)
+    
+    x[i, ] <- c(out[2, 1], x_new)
+    
+  }
+  
+  x <- x %>%
+    as.data.frame() %>%
+    set_colnames(c("time", paste0("S", 1:(ncol(x) - 1))))
+  
+  return(x)
+  
+}
+
+## Euler ********************* ####
+em_generator <- function(y0, grid, seed = NULL, milstein = FALSE, restrict_pos = FALSE) {
+  
+  if(is.null(seed)) {
+    set.seed(sample(1:10000, 1))
+  } else {
+    set.seed(seed)
+  }
+  
+  
+  y <- y0
+  for(i in 2:length(grid)) {
+    
+    y_prev <- y[i-1]
+    delta_t <- grid[i] - grid[i-1]
+    
+    a <- y_prev + cc_drift(y_prev, r, alpha, beta, lambda, epsilon)*delta_t + cc_dispersion(y_prev)*rnorm(1, 0, sqrt(delta_t))
+    
+    # if(milstein) {
+    #   a <- a + .5*dispersion(y_prev)*D_dispersion(y_prev)*(rnorm(1, 0, delta_t) - delta_t)
+    # }
+    
+    
+    if(restrict_pos) {
+      a <- ifelse(a <= 0, 0, a)
+    }
+    y <- c(y, a)
+    
+    y
+    
+  }
+  
+  return(y)
+  
+}
+## Shoji ********************* ####
+
+shoji_cusp_transition_density <- function(x, dt, r, alpha, beta, lambda, epsilon) {
+  drift <- r*(alpha + beta*(x - lambda) - (x - lambda)^3)
+  
+  L <- r*(beta - 3*(x - lambda)^2)
+  M <- r*((epsilon/2)*(- 6*(x - lambda)))
+  
+  Ax <-  x + drift*(exp(L*dt) - 1)/L + M*(exp(L*dt) - 1 - L*dt)/L^2
+  B <- sqrt(epsilon)*sqrt((exp(2*L*dt) - 1)/(2*L))
+  
+  rnorm(1, Ax, B)
+  
+}
+
+shoji_generator <- function(y0, times, r, alpha, beta, lambda, epsilon, seed = 1) {
+  set.seed(seed)
+  y <- y0
+  
+  for(i in 2:length(times)) {
+    dt <- times[i] - times[i-1]
+    
+    y <- c(y, shoji_cusp_transition_density(y[i-1], dt = dt
+                                            , r = r, alpha = alpha, beta = beta, lambda = lambda, epsilon = epsilon))
+  }
+  
+  y
+}
+
+## Cusp ********************** ####
+cc_drift <- function(x, r, alpha, beta, lambda, epsilon) {
+  
+  r*(alpha + beta*(x - lambda) - (x - lambda)^3)
+  
+}
+
+cc_dispersion <- function(x) {
+  # sqrt(epsilon*disp_c*x)
+  sqrt(epsilon)
+}
+
+
+cc_density <- function(x, r, alpha, beta, lambda, epsilon) {
+  
+  unnormalized <- function(x, alpha1 = alpha, beta1 = beta, lambda1 = lambda, epsilon1 = epsilon) {
+    exp( (alpha1*(x - lambda1) + .5*beta1*(x - lambda1)^2 - .25*(x - lambda1)^4 ) / (epsilon1/r))
+  } 
+  
+  M <- integrate(unnormalized, -Inf, Inf)$value
+  
+  
+  unnormalized(x)/M
+  
+}
+
+## Other stuff *************** ####
+
+get_stan_results <- function(samples, parameter, regex = TRUE) {
+  
+  df <- summary(samples)$summary
+  
+  if(regex) {
+    parameter_regex <- str_detect(rownames(df), parameter)
+    
+    res <- df[parameter_regex, c("50%", "25%", "75%", "2.5%", "97.5%")] %>% 
+      as.data.frame()
+  } else {
+    res <- df[parameter, c("50%", "25%", "75%", "2.5%", "97.5%")] %>% 
+      as.data.frame()
+  }
+  
+  
+  
+  if(ncol(res) == 1) {
+    res <- res %>%
+      t
+  }
+  
+  res <- res %>% 
+    as.data.frame() %>% 
+    set_colnames(c("mode", "lower25", "upper75", "lower2.5", "upper97.5"))
+  
+  if(nrow(res) == 1) {
+    res <- res %>% set_rownames(gsub("\\\\", "", parameter))
+  }
+  
+  return(res) 
+}
+
+
+softMax <- function(x) {
+  exp(x)/(sum(exp(x)))
+}
+
+thin <- function(df, time = "x", modulo = 1) {
+  
+  df[(df[, time] %% modulo) == 0, ]
+  
+}
+
+
+grep_rows <- function(df, pattern) {
+  
+  df[grep(pattern, rownames(df)), ]
+  
+}
+
+# matrix to tibble with rownames to column
+m_neat <- function(x, colnames = NULL) {
+  x <- x %>%
+    as.data.frame() %>% 
+    rownames_to_column()
+  
+  if(!is.null(colnames)) {
+    x <- x %>% set_colnames(colnames)
+  }
+  
+  return(x)
+}
+
 # Generate 2d oup
 oup_2d <- function(length = 100, Y0, mu, B, G) {
   
@@ -21,6 +312,33 @@ oup_2d <- function(length = 100, Y0, mu, B, G) {
   }
   
   colnames(Y) <- c("x", "y")
+  
+  return(Y)
+}
+
+# Generate multi d oup
+oup_multi_d <- function(length = 100, Y0, mu, B, G) {
+  
+  D <- nrow(B)
+  
+  Y <- matrix(NA, nrow = length, ncol = D)
+  Y[1, ] <- Y0
+  exp_mB <- expm(-B) %>% as.matrix()
+  
+  for(i in 2:length) {
+    
+    
+    Mean <- mu + exp_mB%*%(Y[i-1, ] - mu)
+    Cov <- G - exp_mB%*%G%*%exp_mB %>%
+      as.matrix()
+    
+    
+    
+    Y[i, ] <- rmvnorm(n = 1, mean = Mean, sigma = Cov)
+    
+  }
+  
+  Y <- Y %>% as.data.frame()
   
   return(Y)
 }
@@ -225,9 +543,7 @@ restricted_rnorm <- function(n, mean, sd, lower = 0) {
 genera_gp_set_stan <- function(n_series, alpha, rho, sigma, intervals, stan_model, seed = 1) {
   set.seed(seed)
   
-  x_total <- seq(from = intervals[1],
-                 to = intervals[length(intervals)],
-                 by = 0.1)
+  x_total <- intervals
   
   N_total <- length(x_total)
   
@@ -259,12 +575,12 @@ genera_gp_set_stan <- function(n_series, alpha, rho, sigma, intervals, stan_mode
   
   # observations
   y <- obs %>% lapply(function(x) {
-    x[(x_total %% 1) == 0, "y"]
+    x[, "y"]
   }) %>% do.call(rbind, .)    
   
   # latent process
   f <- obs %>% lapply(function(x) {
-    x[(x_total %% 1) == 0, "f"]
+    x[, "f"]
   }) %>% do.call(rbind, .)
   
   if(n_series == 1) {

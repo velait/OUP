@@ -7,6 +7,12 @@ library(magrittr)
 library(cowplot)
 library(ggsci)
 library(shinystan)
+library(KScorrect)
+library(Matrix)
+library(matrixcalc)
+library(GGally)
+library(Sim.DiffProc)
+library(cusp)
 
 source("OU.functions.R")
 

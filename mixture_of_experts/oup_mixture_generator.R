@@ -121,8 +121,9 @@ mixture_weights <- cbind(x = x_val, fit_weights) %>%
   geom_line(aes(x = x, y = mode), color = "blue") +
   geom_ribbon(aes(x = x, ymin = lower, ymax = upper), fill = "grey", alpha = .25) +
   geom_line(data = df, aes(x = x, y = y)) +
-  theme_bw() +
-  labs(subtitle = "Red = mixture weight; Blue = MAP weight")
+  theme_bw(15) +
+  labs(subtitle = "Red = latent state; Black = HMM OUP ",
+       y = "Value", x ="Time")
 
 mixture_weights
 

@@ -1,6 +1,3 @@
-functions {
-  
-}
 
 data {
   int<lower = 1> N;
@@ -47,13 +44,13 @@ target += log_mix(mix_weight[1],
 
 // priors
 
-mu[1] ~ normal(-1, 1);
+mu[1] ~ normal(0, 1);
 mu[2] ~ normal(1, 1);
 sigma ~ normal(0, 1);
 // sigma ~ beta(.5, .5);
-// lambda ~ inv_gamma(4, 10);
-lambda ~ normal(0, 1);
-lambda ~ normal(1, 1);
+lambda ~ inv_gamma(4, 10);
+// lambda ~ normal(0, 1);
+// lambda ~ normal(1, 1);
 
 
 

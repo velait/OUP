@@ -14,7 +14,7 @@ rho_true <- 8
 alpha_true <- 8
 sigma <- 1
 n_observations <- 100
-n_total_samples <- 501
+n_total_samples <- 101
 x_total <- 100 * (0:(n_total_samples - 1)) / (n_total_samples - 1)
 seed <- 11235
 
