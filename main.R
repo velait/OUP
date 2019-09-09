@@ -13,12 +13,17 @@ library(matrixcalc)
 library(GGally)
 library(Sim.DiffProc)
 library(cusp)
+library(microbiome)
+library(smoother)
+library(earlywarnings)
+library(ggsignif)
+# library(tvReg)
 
 source("OU.functions.R")
 
 
 chains <- 1
-iter <- 2000
+iter <- 500
 
 
 options(mc.cores = parallel::detectCores())

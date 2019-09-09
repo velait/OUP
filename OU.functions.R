@@ -1,5 +1,1080 @@
 # Functions
 
+## EWS  ********************** ####
+
+## Hierarchical *****
+ar1_hierarchical_ews <- function(series_set, window_prop = .5, iter = 1000, chains = 1) {
+  
+  my_data <- series_set
+  
+  # ar1_hierarchical <- stan_model("stan_models/ar1_hierarchical.stan")
+  
+  # Proportion of time series used for a single window
+  window_prop <- window_prop
+  window_length <- (window_prop*nrow(my_data) - 1) %>% round
+  N_window <- nrow(my_data) - window_length + 1
+  
+  # windows_index <- which((1:N_window)%% 100 == 1)
+  
+  # Results
+  my_res <- lapply(1:N_window, function(j) {
+    
+    dat <- my_data[j:(j + window_length - 1), ]
+    
+    
+    ar1_samples <- sampling(ar1_hierarchical, list(N_times = nrow(dat),
+                                                   N_series = ncol(dat),
+                                                   time = 1:nrow(dat),
+                                                   Y = t(dat)),
+                            chains = chains, iter = iter)
+    
+    
+    
+    # Paramters
+    ar1_pars <- c("lambda", "mu", "sigma", "c", "phi", "stat_variance")
+    coefs <- lapply(ar1_pars, function(p) {
+      
+      my_df <- get_stan_results(ar1_samples, paste0("^", p, "\\["), regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(series = 1:ncol(my_data)) %>% 
+      set_rownames(NULL)
+    
+    
+    # Hyperparameters
+    ar1_hyperpars <- paste0(rep(c("lambda", "sigma", "mu"), each = 2), c("_a", "_b"))
+    hyper_coefs <- lapply(ar1_hyperpars, function(p) {
+      
+      my_df <- get_stan_results(ar1_samples, p, regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(window = j) %>% 
+      set_rownames(NULL)
+    
+    x <- coefs %>% mutate(timeindex = (j + window_length - 1))
+    
+    list("coefs" = x, "hyper_coefs" = hyper_coefs)
+    
+  }) 
+
+  # Rbind the parameter and hyperparamter tables
+  par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  hyper_par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["hyper_coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  
+  
+  
+  list("parameters" = par_res, "hyperparameters" = hyper_par_res)
+  
+}
+oup_hierarchical_ews <- function(series_set, window_prop = .5, iter = 1000, chains = 1) {
+  
+  my_data <- series_set
+  
+  # oup_hierarchical <- stan_model("stan_models/oup_hierarchical_transition.stan")
+  
+  # Proportion of time series used for a single window
+  window_prop <- window_prop
+  window_length <- (window_prop*nrow(my_data) - 1) %>% round
+  N_window <- nrow(my_data) - window_length + 1
+  
+  # windows_index <- which((1:N_window)%% 100 == 1)
+  
+  # Results
+  my_res <- lapply(1:N_window, function(j) {
+    
+    dat <- my_data[j:(j + window_length - 1), ]
+    
+    
+    oup_samples <- sampling(oup_hierarchical, list(N_times = nrow(dat),
+                                                   N_series = ncol(dat),
+                                                   time = 1:nrow(dat),
+                                                   Y = t(dat)),
+                            chains = chains, iter = iter)
+    
+    
+    
+    # Paramters
+    oup_pars <- c("length_scale", "sigma", "stat_var")
+    coefs <- lapply(oup_pars, function(p) {
+      
+      my_df <- get_stan_results(oup_samples, paste0("^", p, "\\["), regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(series = 1:ncol(my_data)) %>% 
+      set_rownames(NULL)
+    
+    
+    # Hyperparameters
+    oup_hyperpars <- paste0(rep(c("length_scale", "stat_var"), each = 2), c("_a", "_b"))
+    hyper_coefs <- lapply(oup_hyperpars, function(p) {
+      
+      my_df <- get_stan_results(oup_samples, p, regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(window = j) %>% 
+      set_rownames(NULL)
+    
+    x <- coefs %>% mutate(timeindex = (j + window_length - 1))
+    
+    list("coefs" = x, "hyper_coefs" = hyper_coefs)
+    
+  }) 
+  
+  # Rbind the parameter and hyperparamter tables
+  par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  hyper_par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["hyper_coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  
+  
+  
+  list("parameters" = par_res, "hyperparameters" = hyper_par_res)
+  
+  
+}
+se_hierarchical_ews <- function(series_set, window_prop = .5, iter = 1000, chains = 1) {
+  
+  my_data <- series_set
+  
+  # se_hierarchical <- stan_model("stan_models/se_hierarchical_covariance.stan")
+  
+  # Proportion of time series used for a single window
+  window_prop <- window_prop
+  window_length <- (window_prop*nrow(my_data) - 1) %>% round
+  N_window <- nrow(my_data) - window_length + 1
+  
+  # windows_index <- which((1:N_window)%% 100 == 1)
+  
+  # Results
+  my_res <- lapply(1:N_window, function(j) {
+    
+    dat <- my_data[j:(j + window_length - 1), ]
+
+    oup_samples <- sampling(se_hierarchical, list(N = nrow(dat),
+                                                   N_series = ncol(dat),
+                                                   x = 1:nrow(dat),
+                                                   y = dat),
+                            chains = chains, iter = iter)
+    
+    
+    
+    # Paramters
+    oup_pars <- c("length_scale", "sigma", "stat_var")
+    coefs <- lapply(oup_pars, function(p) {
+      
+      my_df <- get_stan_results(oup_samples, paste0("^", p, "\\["), regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(series = 1:ncol(my_data)) %>% 
+      set_rownames(NULL)
+    
+    
+    # Hyperparameters
+    oup_hyperpars <- paste0(rep(c("length_scale", "stat_var"), each = 2), c("_a", "_b"))
+    hyper_coefs <- lapply(oup_hyperpars, function(p) {
+      
+      my_df <- get_stan_results(oup_samples, p, regex = TRUE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% 
+        set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      mutate(window = j) %>% 
+      set_rownames(NULL)
+    
+    x <- coefs %>% mutate(timeindex = (j + window_length - 1))
+    
+    list("coefs" = x, "hyper_coefs" = hyper_coefs)
+    
+  }) 
+  
+  # Rbind the parameter and hyperparamter tables
+  par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  hyper_par_res <- lapply(1:length(my_res), function(i) {
+    
+    my_res[[i]][["hyper_coefs"]]
+    
+  }) %>% do.call(rbind, .)
+  
+  
+  
+  list("parameters" = par_res, "hyperparameters" = hyper_par_res)
+  
+  
+}
+
+
+
+
+
+## GP EWS
+
+GP_ews <- function(x, y, window_length, iter = 1000, chains = 1, kernel = "OUP") {
+  
+  ## GET MODEL
+  if(kernel == "OUP") {
+    model <- oup_model
+  } else if(kernel == "se") {
+    model <- se_model
+  } else if(kernel == "matern_1.5") {
+    model <- matern_1.5_model
+  } else if(kernel == "matern_2.5") {
+    model <- matern_2.5_model
+  }
+  
+  ## Number of windows needed
+  N_windows <- which(x <= (x[length(x)] - window_length)) %>% length
+  
+  
+  ## Stan
+  my_res <- lapply(1:N_window, function(j) {
+    
+    indx <- which((x[j] + window_length) >= x)
+    
+    stan_data <- list(N = length(indx), 
+                      N_pred = 1, 
+                      y = y[indx], 
+                      x = x[indx],
+                      x_pred = as.array(j + window_length))
+    
+    
+    samples <- sampling(model,
+                            stan_data,
+                            chains = chains, iter = iter)
+    
+    
+    
+    pars <- c("rho", "sigma", "lp")
+    coefs <- lapply(pars, function(p) {
+      
+      my_df <- get_stan_results(samples, p) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+   
+    # Finalize results
+    vec <- c(window = j, from = j, to = last(x[indx]), (coefs %>% as.matrix)[1, ])
+    
+    vec
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+GP_ews_set <- function(data, iter = 500, chains = 1, window_length, kernel = "OUP") {
+  
+  ## GET MODEL
+  if(kernel == "OUP") {
+    model <- oup_model
+  } else if(kernel == "se") {
+    model <- se_model
+  } else if(kernel == "matern_1.5") {
+    model <- matern_1.5_model
+  } else if(kernel == "matern_2.5") {
+    model <- matern_2.5_model
+  }
+  
+  
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## OUP Bayes *******************************
+  print("Bayesian OUP")
+  res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("OUP: ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    gp <- GP_ews(x = obs_times, y = series, iter = iter, chains = chains, window_length, kernel = kernel)
+    
+    gp <- gp %>%
+      mutate(timeindex = gp$to, series = i)
+    
+    return(gp)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  res
+  
+}
+
+# AR1 ews with missing values
+ar1_missing_ews_set <- function(data, iter = 500, chains = 1, window_length) {
+  
+  mydata <- data %>% 
+    arrange(x) %>% 
+    mutate(x = round(x))
+  
+  na_index <- (min(mydata$x):max(mydata$x))[which(!(min(mydata$x):max(mydata$x) %in% mydata$x))]
+  obs_times <- mydata$x
+  
+  # Separate observations and time
+  obs <- mydata[, 1:(ncol(mydata) - 1)] %>% data.frame()
+  
+  ## AR(1) Bayes *****************************
+  print("Bayesian AR(1)")
+  ar1_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("AR(1): ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    ar1 <- ar1_missing_ews(series = series, na_index, obs_times,
+                           iter = iter, chains = chains, window_length =  window_length)
+
+    ar1 <- ar1 %>%
+      mutate(timeindex = ar1$to, series = i)
+    
+    return(ar1)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  return(ar1_res)
+  
+}
+ar1_missing_ews <- function(series, na_index, obs_index, window_length, iter = 1000, chains = 1) {
+  
+  my_data <- series
+  x <- obs_index
+  
+  ## Number of windows needed
+  N_windows <- which(x <= (x[length(x)] - window_length)) %>% length
+  
+  # ar1_missing_model <- stan_model("stan_models/ar1_missing.stan")
+  
+  my_res <- lapply(1:N_windows, function(j) {
+    
+    present <- which(j:(j + window_length - 1) %in% obs_index)
+    absent <- which(j:(j + window_length - 1) %in% na_index)
+    
+    dat <- my_data[present]
+    
+    ar1_samples <- sampling(ar1_missing_model,
+                            list(N_obs = length(present),
+                                 N_mis = length(absent),
+                                 ii_obs = present,
+                                 ii_mis = absent,
+                                 Y_obs = dat),
+                            chains = chains, iter = iter)
+    
+    
+    
+    oup_pars <- c("lambda", "sigma", "c", "phi", "stat_variance")
+    coefs <- lapply(oup_pars, function(p) {
+      
+      my_df <- get_stan_results(ar1_samples, p, regex = FALSE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    
+    
+    # Next time point likelihood
+    # last <- my_data[j + window_length - 1]
+    # present <- my_data[j + window_length]
+    
+    # LL <- dnorm(present,
+    #             mean = coefs["c"] + coefs["phi"]*present,
+    #             sd = coefs["sigma"]^2) 
+    # Q <- abs(0.5 - pnorm(present, mean = coefs["c"] + coefs["phi"]*present, sd = coefs["sigma"]))*2
+    
+    # x <- c(likelihood_ar1 = LL, iqr_ar1 = Q, window = j, from = j, to = (j + window_length - 1), pred_mean_ar1 = unname(next_m), pred_sd_ar1 = unname(next_sd), coefs %>% set_names(paste0(oup_pars, "_ar1")))
+    
+    x <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix())[1, ])
+    
+    x
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+
+
+
+
+
+
+
+# Bayesian OUP and AR(1)
+oup_ews <- function(x, y, window_length, iter = 1000, chains = 1) {
+  
+  # oup_model <- stan_model("stan_models/oup_fitter.stan")
+  
+  # Proportion of time series used for a single window
+  N_window <- length(y) - window_length + 1
+  
+  my_res <- lapply(1:N_window, function(j) {
+    
+    win_y <- y[j:(j + window_length - 1)]
+    
+    stan_data <- list(N = length(win_y), 
+                      N_pred = 1, 
+                      y = win_y, 
+                      x = x[j:(j + window_length - 1)],
+                      x_pred = as.array(j + window_length))
+    
+    
+    oup_samples <- sampling(oup_model,
+                            stan_data,
+                            chains = chains, iter = iter)
+    
+    
+    
+    oup_pars <- c("rho", "sigma", "lp")
+    coefs <- lapply(oup_pars, function(p) {
+      
+      my_df <- get_stan_results(oup_samples, p) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    # Next time point likelihood
+    # next_m <- coefs["mu"] - (coefs["mu"] - my_data[j + window_length - 1])*exp(-coefs["lambda"])
+    # next_sd <- ((coefs["sigma"]^2)/(2*coefs["lambda"]))*(1-exp(-2*coefs["lambda"]))
+    # 
+    # present <- my_data[j + window_length]
+    # 
+    # LL <- dnorm(present,
+    #             mean = next_m,
+    #             sd = next_sd) 
+    # Q <- abs(0.5 - pnorm(present, mean = next_m, sd = next_sd))*2
+    
+    # x <- c(likelihood = LL, iqr = Q, window = j, from = j, to = (j + window_length - 1), pred_mean = unname(next_m), pred_sd = unname(next_sd), coefs)
+    
+    vec <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix)[1, ])
+    
+    vec
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+ar1_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
+  
+  
+  
+  # ar1_model <- stan_model("stan_models/ar1.stan")
+  
+  # Proportion of time series used for a single window
+  # window_prop <- .5
+  window_length <- (window_prop*length(y) - 1) %>% round
+  N_window <- length(y) - window_length + 1
+  
+  # windows_index <- which((1:N_window)%% 100 == 1)
+  
+  my_res <- lapply(1:N_window, function(j) {
+    
+    dat <- y[j:(j + window_length - 1)]
+    
+    ar1_samples <- sampling(ar1_model, list(T = length(dat),
+                                            time = x[j:(j + window_length - 1)],
+                                            Y = dat),
+                            chains = chains, iter = iter)
+    
+    
+    
+    oup_pars <- c("lambda", "sigma", "c", "phi", "stat_variance")
+    coefs <- lapply(oup_pars, function(p) {
+      
+      my_df <- get_stan_results(ar1_samples, p, regex = FALSE) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    
+    
+    # Next time point likelihood
+    # last <- my_data[j + window_length - 1]
+    # present <- my_data[j + window_length]
+    
+    # LL <- dnorm(present,
+    #             mean = coefs["c"] + coefs["phi"]*present,
+    #             sd = coefs["sigma"]^2) 
+    # Q <- abs(0.5 - pnorm(present, mean = coefs["c"] + coefs["phi"]*present, sd = coefs["sigma"]))*2
+    
+    # x <- c(likelihood_ar1 = LL, iqr_ar1 = Q, window = j, from = j, to = (j + window_length - 1), pred_mean_ar1 = unname(next_m), pred_sd_ar1 = unname(next_sd), coefs %>% set_names(paste0(oup_pars, "_ar1")))
+    
+    x <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix())[1, ])
+    
+    x
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+se_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
+  
+  # se_model <- stan_model("stan_models/square_exp_fitter.stan")
+  
+  # Proportion of time series used for a single window
+  window_length <- (window_prop*length(y) - 1) %>% round
+  N_window <- length(y) - window_length + 1
+  
+  my_res <- lapply(1:N_window, function(j) {
+    
+    win_y <- y[j:(j + window_length - 1)]
+    
+    stan_data <- list(N = length(win_y), 
+                      N_pred = 1, 
+                      y = win_y, 
+                      x = x[j:(j + window_length - 1)],
+                      x_pred = as.array(j + window_length))
+    
+    
+    se_samples <- sampling(se_model,
+                            stan_data,
+                            chains = chains, iter = iter)
+    
+    
+    
+    se_pars <- c("rho", "sigma", "lp")
+    coefs <- lapply(se_pars, function(p) {
+      
+      my_df <- get_stan_results(se_samples, p) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    # Next time point likelihood
+    # next_m <- coefs["mu"] - (coefs["mu"] - my_data[j + window_length - 1])*exp(-coefs["lambda"])
+    # next_sd <- ((coefs["sigma"]^2)/(2*coefs["lambda"]))*(1-exp(-2*coefs["lambda"]))
+    # 
+    # present <- my_data[j + window_length]
+    # 
+    # LL <- dnorm(present,
+    #             mean = next_m,
+    #             sd = next_sd) 
+    # Q <- abs(0.5 - pnorm(present, mean = next_m, sd = next_sd))*2
+    
+    # x <- c(likelihood = LL, iqr = Q, window = j, from = j, to = (j + window_length - 1), pred_mean = unname(next_m), pred_sd = unname(next_sd), coefs)
+    
+    vec <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix)[1, ])
+    
+    vec
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+matern_1.5_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
+  
+  # matern_1.5_model <- stan_model("stan_models/matern_1.5_fitter.stan")
+  
+  # Proportion of time series used for a single window
+  window_length <- (window_prop*length(y) - 1) %>% round
+  N_window <- length(y) - window_length + 1
+  
+  my_res <- lapply(1:N_window, function(j) {
+    
+    win_y <- y[j:(j + window_length - 1)]
+    
+    stan_data <- list(N = length(win_y), 
+                      N_pred = 1, 
+                      y = win_y, 
+                      x = x[j:(j + window_length - 1)],
+                      x_pred = as.array(j + window_length))
+    
+    
+    matern_1.5_samples <- sampling(matern_1.5_model,
+                           stan_data,
+                           chains = chains, iter = iter)
+    
+    
+    
+    matern_1.5_pars <- c("rho", "sigma", "lp")
+    coefs <- lapply(matern_1.5_pars, function(p) {
+      
+      my_df <- get_stan_results(matern_1.5_samples, p) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    # Next time point likelihood
+    # next_m <- coefs["mu"] - (coefs["mu"] - my_data[j + window_length - 1])*exp(-coefs["lambda"])
+    # next_sd <- ((coefs["sigma"]^2)/(2*coefs["lambda"]))*(1-exp(-2*coefs["lambda"]))
+    # 
+    # present <- my_data[j + window_length]
+    # 
+    # LL <- dnorm(present,
+    #             mean = next_m,
+    #             sd = next_sd) 
+    # Q <- abs(0.5 - pnorm(present, mean = next_m, sd = next_sd))*2
+    
+    # x <- c(likelihood = LL, iqr = Q, window = j, from = j, to = (j + window_length - 1), pred_mean = unname(next_m), pred_sd = unname(next_sd), coefs)
+    
+    vec <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix)[1, ])
+    
+    vec
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+matern_2.5_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
+  
+  # matern_2.5_model <- stan_model("stan_models/matern_2.5_fitter.stan")
+  
+  # Proportion of time series used for a single window
+  window_length <- (window_prop*length(y) - 1) %>% round
+  N_window <- length(y) - window_length + 1
+  
+  my_res <- lapply(1:N_window, function(j) {
+    
+    win_y <- y[j:(j + window_length - 1)]
+    
+    stan_data <- list(N = length(win_y), 
+                      N_pred = 1, 
+                      y = win_y, 
+                      x = x[j:(j + window_length - 1)],
+                      x_pred = as.array(j + window_length))
+    
+    
+    matern_2.5_samples <- sampling(matern_2.5_model,
+                                   stan_data,
+                                   chains = chains, iter = iter)
+    
+    
+    
+    matern_2.5_pars <- c("rho", "sigma", "lp")
+    coefs <- lapply(matern_2.5_pars, function(p) {
+      
+      my_df <- get_stan_results(matern_2.5_samples, p) %>% 
+        select(mode, lower2.5, upper97.5)
+      
+      my_df %>% set_colnames(paste0(p, "_", colnames(my_df)))
+      
+    }) %>% do.call(cbind, .) %>% 
+      set_rownames(NULL)
+    
+    
+    
+    # Next time point likelihood
+    # next_m <- coefs["mu"] - (coefs["mu"] - my_data[j + window_length - 1])*exp(-coefs["lambda"])
+    # next_sd <- ((coefs["sigma"]^2)/(2*coefs["lambda"]))*(1-exp(-2*coefs["lambda"]))
+    # 
+    # present <- my_data[j + window_length]
+    # 
+    # LL <- dnorm(present,
+    #             mean = next_m,
+    #             sd = next_sd) 
+    # Q <- abs(0.5 - pnorm(present, mean = next_m, sd = next_sd))*2
+    
+    # x <- c(likelihood = LL, iqr = Q, window = j, from = j, to = (j + window_length - 1), pred_mean = unname(next_m), pred_sd = unname(next_sd), coefs)
+    
+    vec <- c(window = j, from = j, to = (j + window_length - 1), (coefs %>% as.matrix)[1, ])
+    
+    vec
+    
+  }) %>%
+    do.call(rbind, .) %>%
+    as.data.frame()
+  
+  
+  my_res
+  
+  
+  
+}
+
+
+
+ar1_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)]  %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+
+  ## AR(1) Bayes *****************************
+  print("Bayesian AR(1)")
+  ar1_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("AR(1): ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    ar1 <- ar1_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    
+    ar1 <- ar1 %>%
+      mutate(timeindex = ar1$to, series = i)
+    
+    return(ar1)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  return(ar1_res)
+  
+}
+oup_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## OUP Bayes *******************************
+  print("Bayesian OUP")
+  oup_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("OUP: ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    oup <- oup_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    
+    oup <- oup %>%
+      mutate(timeindex = oup$to, series = i)
+    
+    return(oup)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  oup_res
+  
+}
+se_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## OUP Bayes *******************************
+  print("Bayesian GP with SE kernel")
+  se_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("GP: ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    se <- se_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    
+    se <- se %>%
+      mutate(timeindex = se$to, series = i)
+    
+    return(se)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  se_res
+  
+}
+matern_1.5_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## OUP Bayes *******************************
+  print("Bayesian GP with Matern 1.5 kernel")
+  matern_1.5_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("GP: ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    matern <- matern_1.5_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    
+    matern <- matern %>%
+      mutate(timeindex = matern$to, series = i)
+    
+    return(matern)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  matern_1.5_res
+  
+}
+matern_2.5_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## OUP Bayes *******************************
+  print("Bayesian GP with Matern 2.5 kernel")
+  matern_2.5_res <- lapply(1:ncol(obs), function(i) {
+    
+    print(paste0("GP: ", i, " out of ", ncol(obs)))
+    
+    series <- obs[, i]
+    
+    matern <- matern_2.5_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    
+    matern <- matern %>%
+      mutate(timeindex = matern$to, series = i)
+    
+    return(matern)
+    
+  }) %>%
+    do.call(rbind, .)
+  
+  matern_2.5_res
+  
+}
+generic_ews_set <- function(data, window_prop = .5) {
+  
+  # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)]
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## Generic EWS *****************************
+  print("Generic")
+  generic_res <- lapply(1:ncol(obs), function(i) {
+    
+    series <- obs[, i]
+    
+    generic <- generic_ews(series, winsize = window_prop*100)
+    dev.off()
+    
+    generic_pars <- c("ar1", "sd", "sk", "kurt", "cv", "densratio")
+    generic <- generic[, c("timeindex", generic_pars)]
+    
+    generic <- generic %>% mutate(series = i)
+    
+    return(generic)
+    
+  }) %>%
+    do.call(rbind, .)
+}
+ddj_ews_set <- function(data) {
+ 
+   # Separate observations and time
+  obs <- data[, 1:(ncol(data) - 1)]
+  obs_times <- data[, ncol(data)]
+  
+  
+  ## DDJ *************************************
+  print("Drift-Diffusion-Jump")
+  ddj_res <- lapply(1:ncol(obs), function(i) {
+    
+    series <- obs[, i]
+    
+    ddj <- ddjnonparam_ews(data.frame(obs_times, series))
+    
+    
+    # Take timeindex and measures dependent on time
+    ddj <- ddj[names(ddj)[6:10]] %>%
+      do.call(cbind, .) %>%
+      as.data.frame() %>%
+      set_colnames(c("timeindex", "conditional_var", "total_var", "diffusion", "jump_intensity"))
+    
+    
+    ddj <- ddj %>%
+      mutate(series = i)
+    
+    dev.off()
+    
+    return(ddj)
+    
+    
+  }) %>% 
+    do.call(rbind, .)
+  
+  ddj_res
+  
+}
+
+
+
+
+
+
+# Combine the above into one
+ews_wrapper <- function(data, iter = 500, chains = 1) {
+  
+  my_data <- data
+  
+  ar1_res <- ar1_ews_set(my_data, iter, chains)
+  oup_res <- oup_ews_set(my_data, iter, chains)
+  generic_res <- generic_ews_set(my_data, iter, chains)
+  ddj_res <- ddj_ews_set(my_data, iter, chains)
+  
+
+  return(list("generic" = generic_res,
+              "ddj" = ddj_res, 
+              "ar1" = ar1_res,
+              "oup" = oup_res))
+  
+}
+
+
+
+
+## Simulate early warning data
+
+ews_drift <- function(x, r, K, c, h) {
+  
+  return(r*x*(1 - x/K) - c*x^2/(x^2 + h^2))
+  
+}
+
+ews_dispersion <- function(x, sigma) {
+  
+  return(sigma*x)
+  
+}
+
+D_ews_dispersion <- function(x, sigma) {
+  
+  sigma
+  
+}
+
+ews_generator <- function(y0, grid, c, seed = NULL, milstein = FALSE, restrict_pos = FALSE) {
+  
+  # if(is.null(seed)) {
+  #   set.seed(sample(1:10000, 1))
+  # } else {
+  #   set.seed(seed)
+  # }
+  # 
+  
+  y <- y0
+  for(i in 2:length(grid)) {
+    
+    y_prev <- y[i-1]
+    delta_t <- grid[i] - grid[i-1]
+    
+    a <- y_prev + ews_drift(y_prev, r, K, c, h)*delta_t + ews_dispersion(y_prev, sigma)*rnorm(1, 0, sqrt(delta_t))
+    
+    if(milstein) {
+      a <- a + .5*ews_dispersion(y_prev, sigma)*D_ews_dispersion(y_prev, sigma)*(rnorm(1, 0, delta_t) - delta_t)
+    }
+    
+    
+    if(restrict_pos) {
+      a <- ifelse(a <= 0, 0, a)
+    }
+    y <- c(y, a)
+    
+    y
+    
+  }
+  
+  return(y)
+  
+}
+
+
+
 ## Toy data ****************** ####
 
 # Error function, adds stochasticity
@@ -187,14 +1262,18 @@ shoji_cusp_transition_density <- function(x, dt, r, alpha, beta, lambda, epsilon
 }
 
 shoji_generator <- function(y0, times, r, alpha, beta, lambda, epsilon, seed = 1) {
-  set.seed(seed)
+  
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  
   y <- y0
   
   for(i in 2:length(times)) {
     dt <- times[i] - times[i-1]
     
-    y <- c(y, shoji_cusp_transition_density(y[i-1], dt = dt
-                                            , r = r, alpha = alpha, beta = beta, lambda = lambda, epsilon = epsilon))
+    y <- c(y, shoji_cusp_transition_density(y[i-1], dt = dt, 
+                                            r = r, alpha = alpha, beta = beta, lambda = lambda, epsilon = epsilon))
   }
   
   y
@@ -213,10 +1292,10 @@ cc_dispersion <- function(x) {
 }
 
 
-cc_density <- function(x, r, alpha, beta, lambda, epsilon) {
+cc_density <- function(x, rr, aa, bb, ll, ee) {
   
-  unnormalized <- function(x, alpha1 = alpha, beta1 = beta, lambda1 = lambda, epsilon1 = epsilon) {
-    exp( (alpha1*(x - lambda1) + .5*beta1*(x - lambda1)^2 - .25*(x - lambda1)^4 ) / (epsilon1/r))
+  unnormalized <- function(x, alpha1 = aa, beta1 = bb, lambda1 = ll, epsilon1 = ee, rr1 = rr) {
+    exp( (alpha1*(x - lambda1) + .5*beta1*(x - lambda1)^2 - .25*(x - lambda1)^4 ) / (epsilon1/rr1))
   } 
   
   M <- integrate(unnormalized, -Inf, Inf)$value
@@ -226,7 +1305,288 @@ cc_density <- function(x, r, alpha, beta, lambda, epsilon) {
   
 }
 
-## Other stuff *************** ####
+
+
+cc_hsc_density <- function(x, rr, aa, bb, ll, ee, dd) {
+  
+  unnormalized <- function(x, alpha1 = aa, beta1 = bb, lambda1 = ll, epsilon1 = ee, rr1 = rr) {
+    exp( (alpha1*(x - lambda1) + .5*beta1*(x - lambda1)^2 - .25*(x - lambda1)^4 ) / (epsilon1/rr1))
+  } 
+  
+  M <- integrate(unnormalized, -Inf, Inf)$value
+  
+  
+  unnormalized(x)/M
+  
+}
+
+## Forman ******************** ####
+transformator <- function(x, alpha, mix_mean, mix_sd, mix_pro) {
+  
+  qmixnorm(pnorm(x, 0, alpha),
+           mean = mix_mean, 
+           sd = mix_sd,
+           pro = mix_pro)
+  
+}
+## OUP *********************** ####
+oup_generator <- function(N = 100, times = 1:100, y0 = 0, mu = 0, lambda = 0.5, sigma = .25) {
+  
+  y <- rep(0, N)
+  
+  y[1] <- y0
+  
+  
+  for(i in 2:N) {
+    dt <- (times[i] - times[i-1])
+    
+    transition_mu <- mu - (mu - y[i-1])*exp(-lambda*dt)
+    transition_var <- (sigma^2/(2*lambda))*(1 - exp(-2*lambda*dt))
+    
+    y[i] <- rnorm(1, transition_mu, sqrt(transition_var))
+    
+  }
+  
+  return(y)
+}
+
+generate_gp_set <- function(N_series, times, covariance, length_scale, stat_var, error = 0,
+                            seed = NULL, modules = FALSE) {
+  
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  
+  if(isTRUE(modules)) {
+    my_seed <- ifelse(is_null(seed), sample.int(.Machine$integer.max, 1), seed)
+  } else {
+    my_seed <- sample.int(.Machine$integer.max, 1)
+  }
+  
+  # Model
+  # sim_data_model <- stan_model("stan_models/generate_gp.stan")
+  
+  # Set covariance
+  if(covariance == "oup") {
+    kernel <- 0
+  } else if(covariance == "se") {
+    kernel <- 1
+  }
+  
+  
+  time_grid <- seq(from = times[1], to = times[length(times)], by = 0.1)
+  
+  # Generate
+  res <- lapply(1:N_series, function(i) {
+    
+    dat_list <- list(T = length(time_grid),
+                     time = time_grid,
+                     stat_var = stat_var[i],
+                     length_scale = length_scale[i],
+                     error = error[i],
+                     kernel = kernel)
+    
+    
+    draw <- sampling(sim_data_model,
+                     iter=1,
+                     algorithm='Fixed_param',
+                     chains = 1,
+                     data = dat_list, 
+                     seed = my_seed)
+    
+    
+    samps <- rstan::extract(draw)
+    plt_df = with(samps, data.frame(y = y[1,], f = f[1,])) %>% 
+      mutate(index = i)
+    
+    return(plt_df)
+    
+  }) %>%
+    do.call(rbind, .) %>% 
+    cbind(x = time_grid)
+  
+  return(res)
+}
+
+## AR(1) ********************* ####
+
+ar1_generator <- function(times, lambda, sigma, mu = 0, epsilon) {
+  
+  phi <- -lambda
+  c <- lambda*mu
+  
+  x <- rep(0, length(times))
+  
+  x[1] <- rnorm(1, c/(1 - phi), sigma/sqrt(1 - phi^2))
+  
+  
+  for(i in 2:length(times)) {
+    
+    x[i] <- rnorm(1, c + phi*x[i-1], sigma)
+    
+  }
+  
+  if(epsilon != 0) {
+    error <- rnorm(length(times), 0, epsilon)
+  } else {
+    error <- 0
+  }
+  
+  
+  return(x + error)
+}
+
+## MISC ********************** ####
+
+melt_pos_sort <- function(df, id.vars) {
+  
+  my_df <- df
+  
+  cmeans <- my_df %>%
+    select(-one_of(id.vars)) %>%
+    colMeans()
+  
+  my_df <- lapply(1:length(cmeans), function(i) {
+    
+    x <- (my_df %>% select(-one_of(id.vars)))[, i]
+    
+    if(cmeans[i] < 0) {
+      return(-x)
+    } else {
+      return(x)
+    }
+    
+  }) %>% 
+    do.call(cbind, .) %>% 
+    cbind(my_df[, id.vars]) %>% 
+    set_colnames(c(names(cmeans), id.vars))
+  
+  
+  melt_df <- my_df %>%
+    as.data.frame() %>% 
+    melt(id.vars = id.vars) %>% 
+    mutate(variable = factor(variable, levels = names(sort(abs(cmeans)))))
+  
+  
+  return(melt_df)
+  
+}
+list_bind <- function(df_list) {
+  
+  element_length <- sapply(1:length(df_list), function(i) {
+    df_list[[i]] %>% length()
+  })
+  
+  
+  if(length(unique(element_length)) != 1) {
+    stop("List elements are not of equal length")
+  }
+  
+  
+  res <- lapply(1:(element_length)[1], function(i)  {
+    lapply(1:length(df_list), function(j) {
+      
+      df_list[[j]][[i]]
+      
+    }) %>% 
+      do.call(rbind, .)
+  })
+  
+  return(res)
+  
+}
+get_population_distribution <- function(df, par, model = NULL, distribution, padding = 2.5) {
+  
+  my_df <- population_par_res %>% filter(parameter == par)
+  
+  if(!is.null(model)) {
+    
+    my_df <- my_df %>% filter(model == model)
+    
+  }
+  
+  # Get distributions
+  if(distribution == "normal") {
+    
+    dist_df <- lapply(1:nrow(my_df), function(i) {
+      
+      p <- my_df[i, c("a_mode", "b_mode")] %>% as.matrix()
+      
+      x <- seq(from = p[1] - padding*p[2], to = p[1] + padding*p[2], by = .1)
+      y <- dnorm(x, p[1], p[2])
+      
+      data.frame(x = x, y = y, window = i, parameter = par)
+    }) %>% do.call(rbind, .)
+    
+  } else if(distribution == "gamma") {
+    
+    dist_df <- lapply(1:nrow(my_df), function(i) {
+      
+      p <- my_df[i, c("a_mode", "b_mode")] %>% as.matrix()
+      
+      x <- seq(from = 0, to = 5, by = .1)
+      y <- dgamma(x, p[1], p[2])
+      
+      data.frame(x = x, y = y, window = i, parameter = par)
+    }) %>% do.call(rbind, .)
+    
+  }
+  
+  return(dist_df)
+}
+
+pos_sort <- function(df, id.vars) {
+  
+  my_df <- df
+  
+  cmeans <- my_df %>%
+    select(-one_of(id.vars)) %>%
+    colMeans()
+  
+  my_df <- lapply(1:length(cmeans), function(i) {
+    
+    x <- (my_df %>% select(-one_of(id.vars)))[, i]
+    
+    if(cmeans[i] < 0) {
+      return(-x)
+    } else {
+      return(x)
+    }
+    
+  }) %>% 
+    do.call(cbind, .) %>% 
+    cbind(my_df[, id.vars]) %>% 
+    set_colnames(colnames(my_df))
+  
+}
+
+
+mean_and_var <- function(x) {
+  
+  m <- mean(x)
+  v <- var(x)
+  
+  c(mean = m, var = v)
+}
+
+
+# Random truncated normal number generator
+rnorm_trunc <- function(n, mean, sd, trunc = 0) {
+  
+  x <- c(0, n)
+  
+  for(i in 1:n) {
+    y <- trunc - 1 
+    while(y < trunc) {
+      y <- rnorm(1, mean, sd)
+    }
+  
+    x[i] <- y
+    
+  }
+  return(x)
+}
+
 
 get_stan_results <- function(samples, parameter, regex = TRUE) {
   
@@ -266,9 +1626,7 @@ softMax <- function(x) {
 }
 
 thin <- function(df, time = "x", modulo = 1) {
-  
   df[(df[, time] %% modulo) == 0, ]
-  
 }
 
 
@@ -504,10 +1862,6 @@ get_IQRs <- function(stanfit, parameter, parameter_values) {
 
 
   return(IQR_df)
-  
-}
-
-hyperparameter_results <- function(stanfit, parameter, parameter_values) {
   
 }
 

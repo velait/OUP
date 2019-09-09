@@ -12,8 +12,8 @@ x_total <- seq(from = 0, to = 1000,length.out = n_total_samples)
 
 
 mix_mean = c(1, 3)
-mix_sd = c(.2, .5)
-mix_pro = c(.5, .5)
+mix_sd = c(.5, .75)
+mix_pro = c(.25, .75)
 
 transformator <- function(x, alpha, mix_mean, mix_pro) {
   
@@ -27,6 +27,8 @@ transformator <- function(x, alpha, mix_mean, mix_pro) {
 marginal_distributions <- data.frame(x = -500:500/100) %>% 
   mutate(oup = dnorm(x, 0, alpha),
          bimodal = dmixnorm(x, mix_mean, mix_sd, mix_pro))
+
+marginal_distributions %>% melt(id.vars = "x") %>% ggplot(aes(x = x, y=value, color = variable)) + geom_line() 
 
 ## Stan models ******************** ####
 
@@ -77,7 +79,7 @@ processes <- processes %>%
 
 
 # plot process
-processes %>% 
+processes[1:250, ] %>% 
   ggplot() +
   geom_line(aes(x = x, y = oup),color = "red", alpha = .5) +
   geom_line(aes(x = x, y = bimodal)) +

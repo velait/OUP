@@ -108,8 +108,9 @@ model {
     }
   }
 
-  alpha ~ normal(0, 1);
-  beta ~ normal(0, 1);
-  lambda ~ normal(5, 2);
-  epsilon ~ normal(0, 1);
+  alpha ~ normal(0, 2);
+  beta ~ normal(0, 2);
+  lambda ~ normal(0, 2);
+  epsilon ~ normal(0, 2);
+  // epsilon ~ gamma(2, 2);
 }

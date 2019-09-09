@@ -134,8 +134,8 @@ model {
   // pre_theta[, 3] ~ normal(0, 1);
   // epsilon ~ normal(.5, 1);
   
-  alpha ~ normal(0, 1);
-  beta ~ normal(0, 1);
-  lambda ~ normal(0, 1);
-  epsilon ~ normal(0, 1);
+  alpha ~ normal(0, 2);
+  beta ~ normal(0, 2);
+  lambda ~ normal(0, 2);
+  epsilon ~ normal(0, 2);
 }
