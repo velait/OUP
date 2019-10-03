@@ -92,7 +92,7 @@ data {
 
 transformed data {
   
-  real<lower=0> epsilon = 0.1;
+  // real<lower=0> epsilon = 0.1;
   
 }
 
@@ -100,7 +100,7 @@ parameters {
   
   real<lower=0> rho;
   real<lower=0> sigma;
-  // real<lower=0> epsilon;
+  real<lower=0> epsilon;
   vector[N] eta;
 }
 transformed parameters {
@@ -117,7 +117,7 @@ transformed parameters {
 model {
   rho ~ gamma(2, .5);
   sigma ~ normal(0, 1);
-  // epsilon ~ normal(0, 1);
+  epsilon ~ normal(0, 1);
   eta ~ normal(0, 1);
   y ~ normal(f, epsilon);
 }

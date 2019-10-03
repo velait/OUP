@@ -5,10 +5,10 @@
 seed = sample(1:1000, 1)
 
 # 
-# r <- 1
-# alpha <- -1
-# beta <- 1.5
-# lambda <- 0
+r <- 1
+alpha <- -1
+beta <- 1.5
+lambda <- 0
 epsilon <- 1
 
 

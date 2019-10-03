@@ -9,7 +9,7 @@ data {
 
 transformed data {
   
-  real epsilon = 0.1; // error standard deviation
+  // real epsilon = 0.1; // error standard deviation
   int N = N_obs + N_mis;
   
 }
@@ -19,6 +19,8 @@ parameters {
   real mu;
   real<lower=0> sigma;           // volatility
   real<lower=-1, upper=1> lambda;        // mean-reversion
+  real<lower = 0> epsilon;
+  
   
   // real Y_mis[N_mis];
   
@@ -49,7 +51,7 @@ model {
   lambda ~ normal(0, 1);
   sigma  ~ normal(0, 1);
   mu     ~ normal(0, 1);
-  // epsilon ~ normal(0, 1);
+  epsilon ~ normal(0, 1);
 }
 
 generated quantities {

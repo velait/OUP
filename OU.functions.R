@@ -1,5 +1,113 @@
 # Functions
 
+
+
+## Residuals ***************** ####
+get_residuals <- function(df, window = .1) {
+  
+  N <- ncol(df) - 1
+  timeindex <- df[, ncol(df)]
+  
+  res <- lapply(1:N, function(i) {
+    
+    series <- df[, i]
+    smoothed <- ksmooth(timeindex, series, kernel = "normal", 
+                        bandwidth = round(bw.nrd0(timeindex)), 
+                        range.x = range(timeindex), x.points = timeindex)
+    
+    res <- series - smoothed$y
+    return(res)
+  }) %>% do.call(cbind, .) %>%
+    cbind(., df$x) %>% 
+    as.data.frame %>% 
+    set_colnames(c(paste0("V", 1:N), "x"))
+  
+  
+  return(res)
+  
+} 
+
+## Gaussian processes ******** ####
+
+# (Non-stationary) Gaussian process generator, parameters are input
+square_exp_input_set <- function(n = 1, x = 1:100, rho = 5, sigma = 1, epsilon = 1) {
+  
+  # If constant values --> repeat
+  if(length(rho) == 1) rho = rep(rho, length(x))
+  if(length(sigma) == 1) sigma = rep(sigma, length(x))
+  
+  # Stan model
+  # non_stat_square_exp_generator_input_process <- stan_model("GP_generators/non_stat_square_exp_generator_input_process.stan")
+  
+  # Stan data
+  input_dat_list <- list(N = length(x),
+                         x = x, 
+                         sigma = sigma,
+                         rho = rho,
+                         epsilon = epsilon)
+  
+  # Draw samples
+  res <- lapply(1:n, function(i) {
+    
+    draw_input <- sampling(non_stat_square_exp_generator_input_process,
+                           iter=1,
+                           algorithm='Fixed_param',
+                           chains = 1,
+                           data = input_dat_list)
+    
+    
+    samps_input <- rstan::extract(draw_input)
+    
+    samps_input$y %>% t
+    
+  }) %>%
+    do.call(cbind, .) %>% 
+    cbind(x) %>% 
+    set_colnames(c(paste0("V", 1:n), "x")) %>% 
+    as.data.frame()
+  
+  return(res)
+}
+
+oup_input_set <- function(n = 1, x = 1:100, rho = 5, sigma = 1, epsilon = 1) {
+  
+  # If constant values --> repeat
+  if(length(rho) == 1) rho = rep(rho, length(x))
+  if(length(sigma) == 1) sigma = rep(sigma, length(x))
+  
+  # Stan model
+  # non_stat_square_exp_generator_input_process <- stan_model("GP_generators/non_stat_square_exp_generator_input_process.stan")
+  
+  # Stan data
+  input_dat_list <- list(N = length(x),
+                         x = x, 
+                         sigma = sigma,
+                         rho = rho,
+                         epsilon = epsilon)
+  
+  # Draw samples
+  res <- lapply(1:n, function(i) {
+    
+    draw_input <- sampling(non_stat_oup_generator_input_process,
+                           iter=1,
+                           algorithm='Fixed_param',
+                           chains = 1,
+                           data = input_dat_list)
+    
+    
+    samps_input <- rstan::extract(draw_input)
+    
+    samps_input$y %>% t
+    
+  }) %>%
+    do.call(cbind, .) %>% 
+    cbind(x) %>% 
+    set_colnames(c(paste0("V", 1:n), "x")) %>% 
+    as.data.frame()
+  
+  return(res)
+}
+
 ## EWS  ********************** ####
 
 ## Hierarchical *****
@@ -266,7 +374,7 @@ GP_ews <- function(x, y, window_length, iter = 1000, chains = 1, kernel = "OUP")
   
   
   ## Stan
-  my_res <- lapply(1:N_window, function(j) {
+  my_res <- lapply(1:N_windows, function(j) {
     
     indx <- which((x[j] + window_length) >= x)
     
@@ -325,20 +433,21 @@ GP_ews_set <- function(data, iter = 500, chains = 1, window_length, kernel = "OU
   
   
   
-  # Separate observations and time
-  obs <- data[, 1:(ncol(data) - 1)] %>% data.frame()
-  obs_times <- data[, ncol(data)]
-  
+
   
   ## OUP Bayes *******************************
   print("Bayesian OUP")
-  res <- lapply(1:ncol(obs), function(i) {
+  res <- lapply(1:(ncol(data)-1), function(i) {
     
-    print(paste0("OUP: ", i, " out of ", ncol(obs)))
+    print(paste0("OUP: ", i, " out of ", ncol(ncol(data)-1)))
     
-    series <- obs[, i]
     
-    gp <- GP_ews(x = obs_times, y = series, iter = iter, chains = chains, window_length, kernel = kernel)
+    # Separate observations and time
+    obs <- data[, c(i, ncol(data))] %>%
+      data.frame() %>% 
+      drop_na()
+    
+    gp <- GP_ews(x = obs[, 2], y = obs[, 1], iter = iter, chains = chains, window_length, kernel = kernel)
     
     gp <- gp %>%
       mutate(timeindex = gp$to, series = i)
@@ -455,8 +564,80 @@ ar1_missing_ews <- function(series, na_index, obs_index, window_length, iter = 1
   
 }
 
+## Non-stat ews
+ns_GP_ews <- function(x, y, iter = 1000, chains = 1, n_samples = 50) {
+
+    stan_dat <- list(N = length(x), x = x, y = y,
+                     alpha_rho = .5, beta_rho = 10, mu_rho = 2, 
+                     alpha_sigma = .5, beta_sigma = 10, mu_sigma = 0.1)
+    
+    
+    samps <- sampling(non_stat_oup_model, stan_dat,
+                      chains = chains, iter = iter,
+                      control = list(adapt_delta = .95, max_treedepth = 11))
+    
+    res_sum <- lapply(c("rho", "sigma", "f"), function(par) {
+      
+      par_reg <- paste0("^", par, "\\[")
+      
+      get_stan_results(samps, par_reg) %>% 
+        select(mode, lower2.5, upper97.5) %>% 
+        mutate(parameter = par, x = x)
+      
+    }) %>% do.call(rbind, .)
+    
+    res_samps <- lapply(c("rho", "sigma", "f"), function(par) {
+      
+      draws <- (rstan::extract(samps))[[par]]
+      
+      draws <- draws[sample(1:nrow(draws), n_samples), ] %>%
+        t %>% 
+        as.data.frame() %>% 
+        mutate(x = x, parameter = par) 
+      
+      return(draws)
+
+    }) %>% do.call(rbind, .)
+    
+    
+    return(list("summary" = res_sum, "samples" = res_samps))
+
+}
 
 
+
+ns_GP_ews_set <- function(data, iter = 500, chains = 1, n_samples = 50) {
+  
+  # data <- vostok_data
+  
+  res <- lapply(1:(ncol(data)-1), function(i) { 
+    
+    sub_data <- data[, c(i, ncol(data))] %>% 
+      drop_na()
+    
+    ews_res <- ns_GP_ews(x = sub_data[, 2], y = sub_data[, 1], iter = iter, chains = chains, n_samples = n_samples)
+    
+    return(ews_res)
+    
+    }
+  )
+  
+  sum_res <- lapply(1:length(res), function(i) {
+    
+    res[[i]]$summary %>% 
+      mutate(series = i)
+    
+  }) %>% do.call(rbind, .)
+  
+  sample_res <- lapply(1:length(res), function(i) {
+    
+    res[[i]]$samples %>% 
+      mutate(series = i)
+    
+  }) %>% do.call(rbind, .)
+  
+  return(list("summary" = sum_res, "samples" = sample_res))
+}
 
 
 
@@ -526,7 +707,7 @@ oup_ews <- function(x, y, window_length, iter = 1000, chains = 1) {
   
   
 }
-ar1_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
+ar1_ews <- function(x, y, window_length, iter = 1000, chains = 1) {
   
   
   
@@ -534,12 +715,11 @@ ar1_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
   
   # Proportion of time series used for a single window
   # window_prop <- .5
-  window_length <- (window_prop*length(y) - 1) %>% round
-  N_window <- length(y) - window_length + 1
+  N_windows <- which(x <= (x[length(x)] - window_length)) %>% length
   
   # windows_index <- which((1:N_window)%% 100 == 1)
   
-  my_res <- lapply(1:N_window, function(j) {
+  my_res <- lapply(1:N_windows, function(j) {
     
     dat <- y[j:(j + window_length - 1)]
     
@@ -788,22 +968,19 @@ matern_2.5_ews <- function(x, y, window_prop = .5, iter = 1000, chains = 1) {
 
 
 
-ar1_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
+ar1_ews_set <- function(data, iter = 500, chains = 1, window_length) {
   
-  # Separate observations and time
-  obs <- data[, 1:(ncol(data) - 1)]  %>% data.frame()
-  obs_times <- data[, ncol(data)]
-  
-
-  ## AR(1) Bayes *****************************
-  print("Bayesian AR(1)")
-  ar1_res <- lapply(1:ncol(obs), function(i) {
+  res <- lapply(1:(ncol(data)-1), function(i) {
     
-    print(paste0("AR(1): ", i, " out of ", ncol(obs)))
+    print(paste0("OUP: ", i, " out of ", ncol(ncol(data)-1)))
     
-    series <- obs[, i]
     
-    ar1 <- ar1_ews(x = obs_times, y = series, iter = iter, chains = chains, window_prop = window_prop)
+    # Separate observations and time
+    obs <- data[, c(i, ncol(data))] %>%
+      data.frame() %>% 
+      drop_na()
+    
+    ar1 <- ar1_ews(x = obs[, 2], y = obs[, 1], iter = iter, chains = chains, window_length = window_length)
     
     ar1 <- ar1 %>%
       mutate(timeindex = ar1$to, series = i)
@@ -813,7 +990,7 @@ ar1_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
   }) %>%
     do.call(rbind, .)
   
-  return(ar1_res)
+  return(res)
   
 }
 oup_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
@@ -928,10 +1105,10 @@ matern_2.5_ews_set <- function(data, iter = 500, chains = 1, window_prop = .5) {
   matern_2.5_res
   
 }
-generic_ews_set <- function(data, window_prop = .5) {
+generic_ews_set <- function(data, window_prop = .5, detrending = "no") {
   
   # Separate observations and time
-  obs <- data[, 1:(ncol(data) - 1)]
+  obs <- data[, 1:(ncol(data) - 1)] %>% as.data.frame()
   obs_times <- data[, ncol(data)]
   
   
@@ -941,7 +1118,7 @@ generic_ews_set <- function(data, window_prop = .5) {
     
     series <- obs[, i]
     
-    generic <- generic_ews(series, winsize = window_prop*100)
+    generic <- generic_ews(series, winsize = window_prop*100, detrending = detrending, bandwidth = 10)
     dev.off()
     
     generic_pars <- c("ar1", "sd", "sk", "kurt", "cv", "densratio")
@@ -1270,10 +1447,35 @@ shoji_generator <- function(y0, times, r, alpha, beta, lambda, epsilon, seed = 1
   y <- y0
   
   for(i in 2:length(times)) {
+    
     dt <- times[i] - times[i-1]
     
     y <- c(y, shoji_cusp_transition_density(y[i-1], dt = dt, 
-                                            r = r, alpha = alpha, beta = beta, lambda = lambda, epsilon = epsilon))
+                                            r = r, alpha = alpha, beta = beta,
+                                            lambda = lambda, epsilon = epsilon))
+    
+  }
+  
+  y
+}
+
+
+non_stat_shoji_generator <- function(y0, times, r, alpha, beta, lambda, epsilon, seed = 1) {
+  
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  
+  y <- y0
+  
+  for(i in 2:length(times)) {
+    
+    dt <- times[i] - times[i-1]
+    
+    y <- c(y, shoji_cusp_transition_density(y[i-1], dt = dt, 
+                                            r = r[i], alpha = alpha[i], beta = beta[i],
+                                            lambda = lambda[i], epsilon = epsilon[i]))
+    
   }
   
   y
@@ -1437,6 +1639,39 @@ ar1_generator <- function(times, lambda, sigma, mu = 0, epsilon) {
 }
 
 ## MISC ********************** ####
+
+get_stan_results <- function(samples, parameter, regex = TRUE) {
+  
+  df <- summary(samples)$summary
+  
+  if(regex) {
+    parameter_regex <- str_detect(rownames(df), parameter)
+    
+    res <- df[parameter_regex, c("50%", "25%", "75%", "2.5%", "97.5%")] %>% 
+      as.data.frame()
+  } else {
+    res <- df[parameter, c("50%", "25%", "75%", "2.5%", "97.5%")] %>% 
+      as.data.frame()
+  }
+  
+  
+  
+  if(ncol(res) == 1) {
+    res <- res %>%
+      t
+  }
+  
+  res <- res %>% 
+    as.data.frame() %>% 
+    set_colnames(c("mode", "lower25", "upper75", "lower2.5", "upper97.5"))
+  
+  if(nrow(res) == 1) {
+    res <- res %>% set_rownames(gsub("\\\\", "", parameter))
+  }
+  
+  return(res) 
+}
+
 
 melt_pos_sort <- function(df, id.vars) {
   

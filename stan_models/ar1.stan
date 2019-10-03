@@ -5,15 +5,15 @@ data {
 }
 
 transformed data {
-  real epsilon = 0.1; // error standard deviation
+  
+  real mu = 0;
 }
 
 parameters {
-  
-  real mu;
-  real<lower=-1, upper=1> lambda;        // mean-reversion
+  real lambda;        // mean-reversion
   real<lower=0> sigma;          
   
+  real epsilon; // error standard deviation
   
   vector[T] latent_Y;
 }
@@ -35,7 +35,8 @@ model {
   // Priors
   lambda ~ normal(0, 1);
   sigma  ~ normal(0, 1);
-  mu     ~ normal(0, 1);
+  // mu     ~ normal(0, 1);
+  epsilon ~ normal(0, 1);
   
 }
 

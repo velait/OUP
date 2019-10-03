@@ -3,14 +3,17 @@ library(deSolve)
 theme_set(theme_bw(10))
 
 ## Parameters ************************* ####
-n_species <- 5
+n_species <- 3
 stochastic <- TRUE
+
+seed <- 4
 
 ## Toy model
 # k <- sample(c(1, 0.95, 1.05), n_species, replace = T)
 k <- rep(1, n_species)
-b <- sample(c(1, 0.95, 1.05), n_species, replace = T)
-# b <- c(1, .95, 1.05)
+# b <- sample(c(1, 0.95, 1.05), n_species, replace = T)
+# b <- c(.75, .95, 1.05)
+b <- c(1, .95, 1.05)
 # K <- matrix(runif(n_species, 0, 1) %>% round(2),
 #             n_species, n_species, byrow = T)
 K <- rep(0.1, n_species^2) %>% matrix(n_species, n_species, byrow = T)
@@ -22,9 +25,10 @@ K <- K - K*diag(n_species)
 ## Functions ************************** ####
 
 # Error function, adds stochasticity
+stochastic_sd <- .001
 errorer <- function(x) {
   
-  sqrt(abs(x))*rnorm(1, 0, 0.05)
+  sqrt(abs(x))*rnorm(1, 0, stochastic_sd)
   
 }
 
@@ -59,14 +63,27 @@ toy_model <- function(times, y, parms) {
 
 ## Initial values ********************* ####
 
-times <- seq(from = 0, to = 100, by = 0.1)
+times <- seq(from = 0, to = 500, by = 0.1)
 x <- matrix(NA, length(times), n_species + 1)
-x[1, ] <- c(0, sample(1:10/10, n_species, replace = T))
+# x[1, ] <- c(0, sample(1:10/10, n_species, replace = T))
+x[1, ] <- c(0, .98, .008, .01)
+
+# dyn_b <- data.frame(1 - seq(from = 0 , to = .5, length.out = length(times)),
+#                     rep(.95, length(times)),
+#                     rep(1.05, length(times)))
+
+
+dyn_b <- data.frame(c(rep(1.5, (length(times) - 1)/2), rep(.75, (length(times) + 1)/2)),
+                    rep(.95, length(times)),
+                    rep(1.05, length(times)))
+
 
 ## Model ****************************** ####
 
 
 for(i in 2:length(times)) {
+  
+  # b <- dyn_b[i, ] %>% as.numeric()
   
   out <- ode(times = times[(i-1):i],
              y = x[i-1, -1],
@@ -83,7 +100,13 @@ for(i in 2:length(times)) {
     x_new <- x_new + sapply(x_new + 0.01, errorer)
   }
   
+  
+  if(i == ceiling(length(times)/2)) x_new <- x_new + rnorm(1, 0, .1)
+  
+  
   x_new <- ifelse(x_new < 0, 0, x_new)
+  
+  
   
   x[i, ] <- c(out[2, 1], x_new)
   
@@ -94,16 +117,29 @@ for(i in 2:length(times)) {
 
 x <- x %>% as.data.frame() %>% set_colnames(c("time", paste0("V", 1:(n_species))))
 
-x %>% 
+to_relative <- function(df, exclude = "time") {
+  
+  mydf <- df
+  
+  rS <- mydf %>% 
+    select(-c(get(exclude))) %>% 
+    rowSums()
+  
+  mydf[, !(colnames(mydf) %in% exclude)] <- mydf[, !(colnames(mydf) %in% exclude)]/rS
+  
+  
+  return(mydf)
+}
+
+to_relative(x) %>% 
   melt(id.vars = "time") %>%
   ggplot(aes(x = time, y = value, color = variable)) +
   geom_line() +
-  labs(title = "Toy model") +
-  theme(legend.position="none")
+  labs(title = "Toy model")
 
 
 
-x[, 6] %>% hist
+# x[, 6] %>% hist
 
 
 ## DUMP ******************************* ####
