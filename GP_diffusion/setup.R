@@ -1,4 +1,4 @@
-R_packages <- c("magrittr", "tidyverse", "reshape2", "rstan")
+R_packages <- c("magrittr", "tidyverse", "reshape2", "rstan", "microbiome")
 
 # Install missing packages
 missing_packages <- R_packages[!(R_packages %in% installed.packages()[,"Package"])]

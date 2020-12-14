@@ -14,3 +14,21 @@
 # - https://en.wikipedia.org/wiki/Gaussian_process
 # - THE GP book: http://gaussianprocess.org/gpml/chapters/RW.pdf
 
+
+
+## Scripts 
+
+# setup.R
+Get the necessary R packages
+
+# hitchip_functions.R
+Functions. Probably contains some redundant material.
+
+# GP_example.R
+An independent and minimal example of non-parametric regression with Gaussian processes.
+
+# GP.stan
+Stan program for fitting a Gaussian process
+
+# HitChip_data.R
+Wrangles data in HitChip atlas phyloseq, output is abundance and meta data tables, written in .txt files. 
