@@ -91,7 +91,6 @@ transformed parameters {
   theta[, 4] = epsilon;
 }
 
-
 model {
   // Cusp model with Shoji-Ozaki discretization ***************
   
